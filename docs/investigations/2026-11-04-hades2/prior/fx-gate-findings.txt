@@ -1,0 +1,112 @@
+# Findings: swapped-runtime (fx) experiment A/B on the wow64cpu gate
+
+Run dates 2026-11-04, 20:5x-21:1x. Bottles: vol-cxgate (runtime staging-11.21-cxgate,
+= staging 11.21 with CrossOver's wow64cpu.dll swapped in; .swaptest/ holds the
+original) and vol-repro/vol-test (stock staging 11.21).
+
+## Test 1 — memprobe (commit/fault/VirtualAlloc probe), run via run-probe.sh
+
+### vol-cxgate (swapped runtime, CrossOver wow64cpu, workaround engaged)
+results/20261104-205906/vol-cxgate.memprobe32.txt, wine 11.21, LAA yes, Win10.0.19045
+- CPU: brand=GenuineIntel maxleaf=0xd brand=VirtualApple @ 2.50GHz, AVX=1,
+  leaf7: BMI1=1 AVX2=1  <- CrossOver feature handling active
+- AvailablePages=2459824 (9609 MB); AvailablePages*4096 as 32-bit ULONG = 1485504512
+- GlobalMemoryStatusEx: ok=1, TotalPhys=24576 MB AvailPhys=9609 MB
+- Fault delivery: read NULL+0x2EC5 caught=1; 1000 repeated faults caught=1000
+- Commit: 64-1536 MB ok; 2048/3072 MB FAILED err=8; HeapAlloc 2048 MB FAILED
+- END marker: probe finished normally.
+
+### vol-test (stock staging, just re-run; results/20261104-210357/vol-test.memprobe32.txt)
+wine 11.21, LAA yes, Win10.0.19045, IsWow64Process=1
+- AvailablePages=2899000 (11324 MB); AvailablePages*4096 as 32-bit = 3284369408 (wraps >4GB)
+- GlobalMemoryStatusEx: ok=1, AvailPhys=11247 MB
+- Fault delivery: read NULL+0x2EC5 caught=1; 1000 faults caught=1000
+- Commit: same pattern (64-1536 ok, 2048/3072 FAILED, END)
+- END marker: probe finished normally.
+
+## Test 2 — repro-gate.exe (message wndproc + setjmp/longjmp + VirtualAlloc hammer), run
+
+### staging-11.21-cxgate (swapped runtime) — just now, log
+bottles/vol-cxgate/logs/20261104-211114-79983.log; lines=6,001,039; exceptions=6
+- repro-gate: starting hammer loop → repro-gate: done  (completed)
+- wow64cpu.dll loaded at 000000007BF40000: builtin  (the swapped DLL)
+- no c0000005 / wow64cpu crash.
+
+### staging-11.21 (stock, via vol-repro) — earlier today
+lines=6,000,804; exceptions=6; repro-gate: done (completed); wow64cpu at 000000007BF40000 builtin.
+
+## Comparison
+
+- Both runtimes: memprobe completes END; 1000 deliberate faults caught via VEH;
+  32-bit commit-limit behavior identical (2048/3072 FAILED, as expected for LAA).
+- Both runtimes: repro-gate (setjmp/longjmp + wndproc + VirtualAlloc) completes.
+- Swap runtime: CrossOver's wow64cpu engaged (brand=VirtualApple, AVX2/BMI1 handled).
+- The synthetic tests do NOT reproduce the installer's hard fault on stock staging,
+  so the fault is conditional on installer-specific context (likely the GUI thread's
+  SEH/longjmp relay pattern combined with the far-jump path). The swap-runtime does
+  not fault in these tests, which is consistent with CrossOver's workaround making the
+  far-jump/iretq difference moot there — but is NOT yet proof that the far-jump is the
+  crash's root cause, because the trigger path wasn't forced differentially here.
+
+### repro-gate2 (user's full gate stress: syscall / raise / av / callback / setctx / mixed)
+repro-gate2.exe (PE32 console i686, ~139 KB, built 21:11) — phases:
+  syscall, raise (NtRaiseException+continue), av (VEH), callback (SetWindowPos /
+  CreateWindow/DestroyWindow → wndproc + STATUS_LONGJUMP returns inside wow64),
+  setctx (Suspend/Get/SetThreadContext/Resume), mixed.
+
+### staging-11.21 (stock) via vol-repro — log bottles/vol-repro/logs/20261104-211216-84839.log
+RESULT: PASS. Phases: syscall done sys=32,475,197 raise=0 av=0 cb=4 ctx=0 wnd=0;
+  raise done raise=2,010,236; av done av=590,054; callback done cb=315,315;
+  setctx done ctx=348,076; mixed done sys=38,030,437 raise=6,202,425 av=1,512,621
+  cb=1,176,711 ctx=934,039 wnd=2,995. RESULT: PASS.
+
+### staging-11.21-cxgate (fx, swapped runtime, CrossOver wow64cpu) — log
+bottles/vol-cxgate/logs/20261104-211520-99205.log; RESULT: PASS. Phases: 10s each;
+  mixed done sys=17,529,929 raise=2,450,447 av=701,011 cb=628,977 ctx=429,435 wnd=1,601.
+  RESULT: PASS.
+
+## Updated comparison
+
+- memprobe: PASS/END on both stock staging (vol-test) and fx (vol-cxgate).
+- repro-gate: PASS on both.
+- repro-gate2 (full stress incl. iretq/far-jump-relevant paths): PASS on BOTH.
+- fx runtime additionally: CrossOver's Rosetta workaround engaged (brand=VirtualApple,
+  AVX2/BMI1 handled, wow64cpu loaded at 0x7BF40000 after swap).
+
+## Conclusion so far
+
+The synthetic gate stress does NOT reproduce a hard fault on stock staging nor on the
+fx runtime; both complete all phases with only intentional exceptions. Therefore the
+"far-jump vs iretq" discrimination via this test program has not yet shown a crash on
+stock staging. The installer-context dependency remains the leading explanation for the
+original c0000005 in syscall_32to64 on stock staging.
+
+## Next steps available
+
+1. Run the real installer in vol-cxgate (fx runtime) → expect no crash; run in vol-test
+   (stock) → expect crash (already established for stock via vol-test history).
+2. Continue narrowing repro-gate2 phases / add installer-like SEH relay patterns.
+3. Investigate the 32-bit wrap in the installer's probe (AvailablePages*4096).
+
+## DECISIVE RESULT (2026-11-04, ~21:20-22:15) — installer run under fx runtime
+
+Ran the real installer in bottle vol-cxgate (runtime staging-11.21-cxgate = staging 11.21
+with CrossOver's wow64cpu.dll swapped in; WINEDEBUG=+seh,+loaddll,+thread,+process).
+
+- User clicked Install; extraction progressed (bzip3 at ~857% CPU), was NOT frozen
+  (setup.tmp at ~2% CPU), and the install COMPLETED: process exited cleanly ~22:0x,
+  log 20261104-220221-29187.log ended with normal module unloads (unarc.dll, ISDone.dll,
+  innocallback.dll, idp.dll) and no crash.
+
+- Compare: the same installer under STOCK staging froze earlier at ~34MB / 11 files in
+  the worker (VirtualAlloc halving probe loop → infinite size-0 loop).
+
+## Updated conclusion
+
+- Synthetic tests (memprobe, repro-gate, repro-gate2) did NOT crash on either build.
+- Real installer: fx runtime → COMPLETED; stock staging → FROZE.
+- This does not by itself prove the retfq/far-jump is the root cause, but it is the first
+  clean, real-world, real-installer data point in this investigation that the swapped
+  wow64cpu (CrossOver) is protective and stock is not — strongly supporting the far-jump
+  hypothesis for Report 1, and making the swap a viable local workaround to test
+  (full completion of extraction = workaround works for the freeze path).

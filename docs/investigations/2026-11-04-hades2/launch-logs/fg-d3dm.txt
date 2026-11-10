@@ -1,0 +1,429 @@
+== 20261104-202028-56194  (3039 KB)
+# decant run Wed Nov  4 20:20:28 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: ~/Desktop/decant-investigation-logs/probe/memprobe32.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+seh,+loaddll,+thread,+process
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+memprobe 1
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size bff00000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 9ff00000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 8ff00000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 87f00000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 83f00000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 81f00000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 80f00000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 80700000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 80300000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 80100000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 80000000
+commit 2048 MB: FAILED err=8
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size c0000000
+commit 3072 MB: FAILED err=8
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 80010000
+HeapAlloc 2048 MB: FAILED
+
+== 20261104-205906-64429  (3039 KB)
+# decant run Wed Nov  4 20:59:06 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: ~/Desktop/decant-investigation-logs/probe/memprobe32.exe C:\decant-logs\memprobe-memprobe32.txt
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-cxgate/prefix/drive_c/decant-logs/memprobe-memprobe32.txt
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+seh,+loaddll,+thread,+process
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+memprobe 1
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size bff00000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 9ff00000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 8ff00000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 87f00000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 83f00000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 81f00000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 80f00000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 80700000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 80300000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 80100000
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 80000000
+commit 2048 MB: FAILED err=8
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size c0000000
+commit 3072 MB: FAILED err=8
+00f4:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 80010000
+HeapAlloc 2048 MB: FAILED
+
+== 20261104-205909-64778  (2995 KB)
+# decant run Wed Nov  4 20:59:09 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: ~/Desktop/decant-investigation-logs/probe/memprobe32-nolaa.exe C:\decant-logs\memprobe-memprobe32-nolaa.txt
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-cxgate/prefix/drive_c/decant-logs/memprobe-memprobe32-nolaa.txt
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+seh,+loaddll,+thread,+process
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+memprobe 1
+010c:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 7ff00000
+010c:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 7bf00000
+010c:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 7b700000
+010c:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 7b300000
+commit 2048 MB: FAILED err=487
+commit 3072 MB: FAILED err=487
+HeapAlloc 2048 MB: FAILED
+
+== 20261104-205910-64867  (965 KB)
+# decant run Wed Nov  4 20:59:10 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: ~/Desktop/decant-investigation-logs/probe/memprobe64.exe C:\decant-logs\memprobe-memprobe64.txt
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-cxgate/prefix/drive_c/decant-logs/memprobe-memprobe64.txt
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+seh,+loaddll,+thread,+process
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+memprobe 1
+
+== 20261104-211114-79983  (629007 KB)
+# decant run Wed Nov  4 21:11:14 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: C:\repro\repro-gate.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+seh,+loaddll,+thread,+process
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+repro-gate: starting hammer loop
+repro-gate: done
+
+== 20261104-211157-83517  (22 KB)
+# decant run Wed Nov  4 21:11:57 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: ~/Desktop/decant-investigation-logs/probe/repro-gate2.exe 1
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+repro-gate2: 1s per phase
+syscall  done in   1.0s  sys=1567639 raise=0 av=0 cb=4 ctx=0 wnd=0
+raise    done in   1.0s  sys=1567639 raise=92872 av=0 cb=4 ctx=0 wnd=0
+av       done in   1.0s  sys=1567639 raise=92872 av=34790 cb=4 ctx=0 wnd=0
+callback done in   1.0s  sys=1567639 raise=92872 av=34790 cb=15546 ctx=0 wnd=40
+setctx   done in   1.0s  sys=1570439 raise=92872 av=34790 cb=15546 ctx=17360 wnd=40
+mixed    done in   3.0s  sys=1808833 raise=273576 av=75169 cb=47223 ctx=42990 wnd=121
+RESULT: PASS
+
+== 20261104-211520-99205  (22 KB)
+# decant run Wed Nov  4 21:15:20 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: C:\repro\repro-gate2.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+repro-gate2: 10s per phase
+syscall  done in  10.0s  sys=15154380 raise=0 av=0 cb=4 ctx=0 wnd=0
+raise    done in  10.0s  sys=15154380 raise=667716 av=0 cb=4 ctx=0 wnd=0
+av       done in  10.0s  sys=15154380 raise=667716 av=302484 cb=4 ctx=0 wnd=0
+callback done in  10.0s  sys=15154380 raise=667716 av=302484 cb=191223 ctx=0 wnd=487
+setctx   done in  10.0s  sys=15163415 raise=667716 av=302484 cb=191223 ctx=166724 wnd=487
+mixed    done in  30.0s  sys=17529929 raise=2450447 av=701011 cb=628977 ctx=429435 wnd=1601
+RESULT: PASS
+
+== 20261104-211602-3062  (4 KB)
+# decant run Wed Nov  4 21:16:02 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: ~/Desktop/decant-investigation-logs/probe/repro-gate2.exe 20
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+repro-gate2: 20s per phase
+syscall  done in  20.0s  sys=6855635 raise=0 av=0 cb=4 ctx=0 wnd=0
+raise    done in  20.0s  sys=6855635 raise=818589 av=0 cb=4 ctx=0 wnd=0
+av       done in  20.0s  sys=6855635 raise=818589 av=599883 cb=4 ctx=0 wnd=0
+callback done in  20.0s  sys=6855635 raise=818589 av=599883 cb=286026 ctx=0 wnd=728
+setctx   done in  20.0s  sys=6887913 raise=818589 av=599883 cb=286026 ctx=351134 wnd=728
+mixed    done in  60.0s  sys=12293046 raise=4763929 av=1491660 cb=1166439 ctx=921163 wnd=2969
+RESULT: PASS
+
+== 20261104-214923-3586  (18 KB)
+# decant run Wed Nov  4 21:49:23 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: ~/Desktop/decant-investigation-logs/probe/repro-smc.exe 50
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+seh,+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+RESULT: PASS
+
+== 20261104-215028-9214  (24 KB)
+# decant run Wed Nov  4 21:50:28 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: ~/Desktop/decant-investigation-logs/probe/repro-smc.exe 500
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+RESULT: PASS
+
+== 20261104-215030-9332  (10 KB)
+# decant run Wed Nov  4 21:50:30 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: ~/Desktop/decant-investigation-logs/probe/repro-smc.exe 500
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+RESULT: PASS
+
+== 20261104-215032-9662  (10 KB)
+# decant run Wed Nov  4 21:50:32 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: ~/Desktop/decant-investigation-logs/probe/repro-smc.exe 500
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+RESULT: PASS
+
+== 20261104-220221-29187  (1676 KB)
+# decant run Wed Nov  4 22:02:21 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: C:\decant-stage\Hades II installer-setup\setup.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+0148:err:richedit:ReadStyleSheet skipping optional destination
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 80000000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 7fff0000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 7ffe8000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 7ffe4000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 7ffe2000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 7ffe1000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 60000000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 58000000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 54000000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 52000000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 51000000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 50800000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 50400000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 50200000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 50100000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 50080000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 50040000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 50038000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 50034000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 50032000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 50031000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 40000000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 20000000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 10000000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 0f800000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 0f400000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 0f200000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 0f100000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 0f0f8000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 0f0f4000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 0f0f2000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 0f0f1000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 0c000000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 0a000000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 09f80000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 09f70000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 09f68000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 09f64000
+01e8:err:virtual:allocate_virtual_memory out of memory for allocation, base 0x0 size 09f62000
+
+== 20261104-222351-21549  (30 KB)
+# decant run Wed Nov  4 22:23:51 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: ~/Library/Application Support/Decant/bottles/fg-cxgate/prefix/drive_c/Program Files/Hades II/Release/F10.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+
+== 20261104-222615-23930  (29 KB)
+# decant run Wed Nov  4 22:26:15 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: ~/Library/Application Support/Decant/bottles/fg-cxgate/prefix/drive_c/Program Files/Hades II/Release/F10.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+
+== 20261104-224521-41543  (42 KB)
+# decant run Wed Nov  4 22:45:21 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: C:\Program Files\Hades II\Release\Hades2.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+2026-11-04 22:45:24 [MainThread      ]       PlatformFile.cpp:331    ERR| faied to open File :checksums.txt
+2026-11-04 22:45:24 [MainThread      ]            Program.cpp:2755   ERR| Scripts modification detected.
+2026-11-04 22:57:47 [MainThread      ]       PlatformFile.cpp:331    ERR| faied to open File :checksums.txt
+2026-11-04 22:57:47 [MainThread      ]     ProfileManager.cpp:269    ERR| unable to read last active profile file: 
+2026-11-04 22:57:47 [MainThread      ]     ProfileManager.cpp:222    ERR| Load profile Profile1.sjson failed! Load status: 1
+2026-11-04 22:57:47 [MainThread      ]     ProfileManager.cpp:222    ERR| Load profile GlobalSettingsWin.sjson failed! Load status: 1
+2026-11-04 22:57:48 [MainThread      ]            Program.cpp:960    ERR| Assert: File = C:\Jenkins\workspace\Iris_PC_Latest\Code\Engine.Native\Windows\Code\SDL2_GamePad.cpp, Line = 349, Condition = sNumSupportedGamePads > 0, Message = NumSupportedGamePads is 0. Is there a problem with GamePadModels.sjson?,
+
+== 20261104-230834-93566  (45 KB)
+# decant run Wed Nov  4 23:08:34 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: C:\Program Files\Hades II\Release\Hades2.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+2026-11-04 23:08:42 [MainThread      ]       PlatformFile.cpp:331    ERR| faied to open File :checksums.txt
+2026-11-04 23:08:42 [MainThread      ]            Program.cpp:2755   ERR| Scripts modification detected.
+2026-11-04 23:08:47 [MainThread      ]       PlatformFile.cpp:331    ERR| faied to open File :checksums.txt
+2026-11-04 23:08:47 [MainThread      ]     ProfileManager.cpp:222    ERR| Load profile Profile1.sjson failed! Load status: 1
+2026-11-04 23:08:47 [MainThread      ]     ProfileManager.cpp:222    ERR| Load profile GlobalSettingsWin.sjson failed! Load status: 1
+2026-11-04 23:08:47 [MainThread      ]       SDL2_GameP2026-11-04 23:08:47 [MainThread      ]            Program.cpp:960    ERR| Assert: File = C:\Jenkins\workspace\Iris_PC_Latest\Code\Engine.Native\Windows\Code\SDL2_GamePad.cpp, Line = 349, Condition = sNumSupportedGamePads > 0, Message = NumSupportedGamePads is 0. Is there a problem with GamePadModels.sjson?,
+
+== 20261104-230913-95374  (15 KB)
+# decant run Wed Nov  4 23:09:13 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: C:\decant probe\sub dir\argprobe.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+
+== 20261104-231003-96192  (33 KB)
+# decant run Wed Nov  4 23:10:03 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: C:\Program Files\Hades II\Ship\Hades2.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+2026-11-04 23:10:08 [MainThread      ]     ProfileManager.cpp:222    ERR| Load profile Profile1.sjson failed! Load status: 1
+2026-11-04 23:10:08 [MainThread      ]     ProfileManager.cpp:222    ERR| Load profile GlobalSettingsWin.sjson failed! Load status: 1
+2026-11-04 23:10:08 [MainThread      ]      ForgeRenderer.cpp:2192  INFO| Aftermath GFSDK_Aftermath_EnableGpuCrashDumps failed
+2026-11-04 23:10:08 [MainThread      ]      ForgeRenderer.cpp:2200  INFO| Graphics Adapter Preferece: AUTO
+2026-11-04 23:10:10 [MainThread      ]         Direct3D12.cpp:1920   ERR| No available D3D12 adapter found.
+2026-11-04 23:10:10 [MainThread      ]            Program.cpp:307    ERR| Renderer creation failed. Please ensure your graphics card meets the minimum requirement.
+2026-11-04 23:10:48 [MainThread      ]            Program.cpp:3259   ERR| Renderer was not initialized.
+
+== 20261104-231958-13595  (24 KB)
+# decant run Wed Nov  4 23:19:58 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate+d3dmetal
+# cmd: C:\Program Files\Hades II\Ship\Hades2.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d11,d3d12,d3d10core=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-cxgate/prefix
+0024:err:module:loader_init "d3d12.dll" failed to initialize, aborting
+0024:err:module:loader_init Initializing dlls for L"C:\\Program Files\\Hades II\\Ship\\Hades2.exe" failed, status 80000100
+
+== 20261104-232135-15646  (12 KB)
+# decant run Wed Nov  4 23:21:35 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/crossover-26.1.0+d3dmetal
+# cmd: C:\Program Files\Hades II\Ship\Hades2.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=dxgi,d3d11,d3d12,d3d10core=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-d3dm/prefix
+2026-11-04 23:21:46 [MainThread      ]     ProfileManager.cpp:222    ERR| Load profile Profile1.sjson failed! Load status: 1
+2026-11-04 23:21:46 [MainThread      ]     ProfileManager.cpp:222    ERR| Load profile GlobalSettingsWin.sjson failed! Load status: 1
+2026-11-04 23:21:46 [MainThread      ]      ForgeRenderer.cpp:2192  INFO| Aftermath GFSDK_Aftermath_EnableGpuCrashDumps failed
+2026-11-04 23:21:46 [MainThread      ]      ForgeRenderer.cpp:2200  INFO| Graphics Adapter Preferece: AUTO
+HRESULT DXGIGetDebugInterface1(UINT, const IID *const, void **)
+2026-11-04 23:21:49 [MainThread      ]      ForgeRenderer.cpp:2251  INFO| Aftermath GFSDK_Aftermath_DX12_Initialize failed
+2026-11-04 23:21:49 [MainThread      ]      ForgeRenderer.cpp:2261  INFO| Amd driver version detected: 0
+2026-11-04 23:21:49 [MainThread      ]      ForgeRenderer.cpp:2262  INFO| Nvidia driver version detected: 0
+2026-11-04 23:21:49 [MainThread      ]            Program.cpp:3265  INFO| Renderer Initialized
+2026-11-04 23:21:49 [MainThread      ]      ForgeRenderer.cpp:2520  INFO| ForgeRenderer::Load
+2026-11-04 23:21:49 [MainThread      ]            Program.cpp:3285  INFO| Renderer Loaded
+2026-11-04 23:21:49 [MainThread      ]                App.cpp:220   INFO| Done with constructor
+2026-11-04 23:21:50 [MainThread      ]      ForgeRenderer.cpp:2959  INFO| Early pipeline creation for Default, BS_AlphaBlend, DS_None
+2026-11-04 23:21:50 [MainThread      ]      ForgeRenderer.cpp:2963  INFO| Early pipeline creation for Blit2D, BS_Opaque, DS_None
+2026-11-04 23:21:50 [MainThread      ]      ForgeRenderer.cpp:2967  INFO| Early pipeline creation for Blit2DDepth, BS_Opaque, DS_DepthWrite
+2026-11-04 23:21:50 [MainThread      ]      ForgeRenderer.cpp:2971  INFO| Early pipeline creation finished
+2026-11-04 23:21:50 [MainThread      ]   GameAssetManager.cpp:642   INFO| Done reading manifest Launch
+2026-11-04 23:21:51 [MainThread      ]  PlatformAnalytics.cpp:36    INFO| Done initializing Analytics: Disabled
+

@@ -1,0 +1,5 @@
+RUNTIME=crossover-26.1.0
+BACKEND=dxmt
+AVX=1
+MSYNC=1
+WINVER=win7

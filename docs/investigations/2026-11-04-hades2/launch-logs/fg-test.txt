@@ -1,0 +1,117 @@
+== 20261104-164423-84278: same log as in an earlier bottle (bottle was cloned)
+== 20261104-164758-96075: same log as in an earlier bottle (bottle was cloned)
+== 20261104-170742-10885: same log as in an earlier bottle (bottle was cloned)
+== 20261104-171122-23309: same log as in an earlier bottle (bottle was cloned)
+== 20261104-171342-31224: same log as in an earlier bottle (bottle was cloned)
+== 20261104-172559-71514: same log as in an earlier bottle (bottle was cloned)
+== 20261104-173117-89855: same log as in an earlier bottle (bottle was cloned)
+== 20261104-173119-90132: same log as in an earlier bottle (bottle was cloned)
+== 20261104-173120-90221: same log as in an earlier bottle (bottle was cloned)
+== 20261104-174945-48551: same log as in an earlier bottle (bottle was cloned)
+== 20261104-210357-70661  (3 KB)
+# decant run Wed Nov  4 21:03:57 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/decant-investigation-logs/probe/memprobe32.exe C:\decant-logs\memprobe-memprobe32.txt
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-test/prefix/drive_c/decant-logs/memprobe-memprobe32.txt
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+memprobe 1
+commit 2048 MB: FAILED err=8
+commit 3072 MB: FAILED err=8
+HeapAlloc 2048 MB: FAILED
+
+== 20261104-210359-70772  (3 KB)
+# decant run Wed Nov  4 21:03:59 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/decant-investigation-logs/probe/memprobe32-nolaa.exe C:\decant-logs\memprobe-memprobe32-nolaa.txt
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-test/prefix/drive_c/decant-logs/memprobe-memprobe32-nolaa.txt
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+memprobe 1
+commit 2048 MB: FAILED err=487
+commit 3072 MB: FAILED err=487
+HeapAlloc 2048 MB: FAILED
+
+== 20261104-210401-71097  (3 KB)
+# decant run Wed Nov  4 21:04:01 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/decant-investigation-logs/probe/memprobe64.exe C:\decant-logs\memprobe-memprobe64.txt
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-test/prefix/drive_c/decant-logs/memprobe-memprobe64.txt
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+memprobe 1
+
+== 20261104-222728-25315  (0 KB)
+# decant run Wed Nov  4 22:27:28 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Downloads/Hades II installer/setup.exe /LOG=C:\decant-logs\20261104-222728-setup.log
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-test/prefix/drive_c/decant-logs/20261104-222728-setup.log
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+
+== 20261105-001457-83173  (0 KB)
+# decant run Thu Nov  5 00:14:57 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# backend: wined3d
+# cmd: /private/tmp/claude-501/-Users-<user>-Desktop-repos/8ca960b8-732f-4c68-ace9-b8c8d6879558/scratchpad/bsprobe.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+
+== 20261105-001503-83584  (0 KB)
+# decant run Thu Nov  5 00:15:03 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# backend: wined3d
+# cmd: /private/tmp/claude-501/-Users-<user>-Desktop-repos/8ca960b8-732f-4c68-ace9-b8c8d6879558/scratchpad/bsprobe.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+
+== 20261105-001509-84107  (0 KB)
+# decant run Thu Nov  5 00:15:09 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# backend: wined3d
+# cmd: /private/tmp/claude-501/-Users-<user>-Desktop-repos/8ca960b8-732f-4c68-ace9-b8c8d6879558/scratchpad/bsprobe.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+

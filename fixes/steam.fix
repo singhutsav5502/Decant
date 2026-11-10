@@ -1,0 +1,16 @@
+# Steam client (Windows build) under Wine on Apple Silicon.
+# Case notes, diagnosis and evidence: docs/fixes/steam.md
+TITLE=Steam client: black windows and broken sign-in
+MATCH=steam.exe
+# -noverifyfiles: stop Steam's startup integrity check from swapping our shim back out.
+ARGS=-noverifyfiles -cef-disable-gpu
+# Steam's own -cef-* flags never reach the browser helper, so shim it directly.
+# Chromium child processes (--type=...) pass through untouched.
+SHIM=bin/cef/cef.win*/steamwebhelper.exe|--disable-gpu --single-process|--type= --single-process
+# decant install <bottle> steam
+INSTALL_URL=https://cdn.akamai.steamstatic.com/client/installer/SteamSetup.exe
+INSTALL_ARGS=/S
+PROGRAM=Steam|C:\Program Files (x86)\Steam\steam.exe
+NOTES=docs/fixes/steam.md
+SOURCE=https://github.com/notpop/steam-on-m1-wine
+VERIFIED=2026-11-05 macOS-26.6 Apple-M5: crossover-26.1.0 BACKEND=auto (resolves to d3dmetal): Steam, 9 Kings and Silksong play. Earlier: wine-staging-11.21+dxvk, crossover-26.1.0+dxmt

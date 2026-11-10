@@ -1,0 +1,26 @@
+--- a/dlls/ntdll/unix/virtual.c	2026-11-05 00:17:46
++++ b/dlls/ntdll/unix/virtual.c	2026-11-05 00:17:46
+@@ -5117,7 +5117,22 @@
+                 free_reserved_memory( 0, (char *)0x7ffe0000 );
+ #endif
+         }
+-        else user_space_wow_limit = (large_address_space_active ? limit_4g : limit_2g) - 1;
++        else
++        {
++            user_space_wow_limit = (large_address_space_active ? limit_4g : limit_2g) - 1;
++            /* Decant: keep the 64k block at 0xfffd0000 in use in a large-address-aware wow64
++             * process, as upstream Wine 11.21 does, so no free block above 2GB reaches 2GB.
++             * FreeArc's unarc.dll (used by many Inno Setup installers) finds its largest
++             * reservation with a 32-bit (lo + hi) >> 1 binary search that never ends once
++             * a 2GB reservation succeeds. Opt-in: DECANT_WOW64_RESERVE_TOP=1 (Decant sets
++             * it on every launch; docs/adr/0015, docs/adr/0020). */
++            if (large_address_space_active && getenv( "DECANT_WOW64_RESERVE_TOP" ))
++            {
++                void *top = (void *)0xfffd0000;
++                SIZE_T top_size = 0x10000;
++                NtAllocateVirtualMemory( NtCurrentProcess(), &top, 0, &top_size, MEM_RESERVE, PAGE_NOACCESS );
++            }
++        }
+     }
+     else
+     {

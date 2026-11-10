@@ -1,0 +1,207 @@
+instrumented crash attribution (run of 2026-11-04 17:49, bottle "vol-test", runtime staging-11.21)
+================================================================================
+(pre-review version kept as wow64cpu-attribution.orig.txt)
+
+CORRECTIONS (review of all three runs, 2026-11-04) - read these first
+---------------------------------------------------------------------
+C1. Faulting thread: tid 0148 is the MAIN/GUI thread of setup.tmp (pid 0144,
+    created at log line 933). It is not the extraction worker. The staging
+    crash and the crossover probe loop (worker 0178, different run) are on
+    different threads; nothing links them in time or mechanism.
+C2. Fault address: info[0]=0 (read), info[1]=0x2EC5. 0x2EC5 is exactly the
+    disp32 of "movl 0x2ec5(%rip),%edx". In 32-bit/compatibility mode, ModRM
+    mod=00 rm=101 means absolute [disp32] instead of [rip+disp32]. So the
+    64-bit gate instruction was decoded in 32-bit mode: the switch into
+    64-bit mode on the 32->64 gate did not take effect. This is the key
+    lead, replacing "half-corrupted CPU state" / "RIP ~ 0" readings.
+C3. cs=0x002b is NOT a 32-bit selector here: ordinary 64-bit contexts in the
+    same log (rip inside 64-bit ntdll, 0x6ffffff99110) also show cs=002b.
+    ss=0000 IS anomalous: those same ordinary contexts show ss=0023.
+C4. The RtlUnwindEx(0x80000026 STATUS_LONGJUMP) + ThreadWow64Context cycles
+    appear to be Wine's normal wow64 callback-return path (target_ip inside
+    wow64.dll); the same pattern occurs harmlessly in setup.exe's main
+    thread 00f4. Context only, not a cause, and not "the installer's own
+    unwind".
+C5. Exception count: the log has 1594 "dispatch_exception code=c0000005"
+    lines (matches summary.txt), not 797.
+C6. The second run's "wedged in the 64->32 return gate" and the
+    "common denominator: far-jump/context relay" story are withdrawn - see
+    THIRD run. The third run's point 5 timing claim (staging fault "during
+    the same probe loop") is withdrawn too: the staging run had no
+    +virtual/+file channels and no allocation trace before the fault.
+C7. Probe-loop reservations succeeding is expected: setup.tmp is
+    large-address-aware (TotalVirtual 0xFFFE0000), and probe/results shows
+    Wine's layout matches 64-bit Windows (non-LAA largest reserve 1970 MB;
+    LAA 4 GB, 2048 MB free at 0x7FFE1000). The loop also ignores the
+    VirtualAlloc result (continues after success and after failure), so
+    "address space not constrained -> descends to 0" is not the cause.
+C8. Sizes 0x1ff..0x1 also succeed (rounded to one page); only 0 fails.
+    "Down to 512 bytes" was imprecise. No gate-crossing rate can be stated:
+    the logs have no timestamps.
+
+Crash signature (deterministic, reproduced on every click of Install):
+  one real access violation inside Wine's own WOW64 syscall gate, then a
+  recursive null-handler walk to stack overflow.
+
+Evidence
+--------
+1. Module map from WINEDEBUG=+loaddll (32-bit process "setup.tmp"):
+     setup.tmp            0x00400000  native   (Inno engine)
+     idp.dll              0x01960000  native   (InnoDownloadPlugin)
+     innocallback.dll     0x019C0000  native
+     ISDone.dll           0x01AE0000  native
+     (kernel32 0x7BEE0000, ntdll(32) 0x7BF50000 ... all builtin)
+     wow64cpu.dll         0x7BF40000  builtin
+     wow64.dll            0x6FFFFEBC0000  builtin
+     ntdll(64)            0x6FFFFFF40000  builtin
+   => fault address 0x7BF41135 = wow64cpu base + 0x1135. NOT in any of the
+      installer's own DLLs.
+
+2. Which instruction that is: disassembly of
+   lib/wine/x86_64-windows/wow64cpu.dll (staging-11.21 build):
+     0x110c: xchgq %r14,%rsp          ; syscall_32to64 entry (saves 32-bit
+     0x110f: movl %edi,0x9c(%r13)     ;  registers into the wow64 context)
+     ...
+     0x112b: movl (%r14),%edx         ; return address from 32-bit stack
+     0x1135: movl 0x2ec5(%rip),%edx   ; <-- FAULTING INSTRUCTION
+     0x113b: movl %edx,0xbc(%r13)     ; stores SegCs into context
+   This matches upstream wine source dlls/wow64cpu/cpu.c:
+     "movl cs32_sel(%rip),%edx"   /* context->SegCs */
+   The CrossOver (26.1) build of wow64cpu.dll carries the same code, byte-
+   annotated as <syscall_32to64>, at a slightly different offset.
+
+3. cs32_sel download target: for staging's wow64cpu the RIP-relative
+   displacement is 0x2ec5, computed target = wow64cpu_base + 0x4000.
+   PE section table: .data VA=0x3000 VirtualSize=0x300C, so RVA 0x4000 is
+   mapped zero-fill belonging to .data. The page is MAPPED; the read should
+   never fault in a correctly-set-up image.
+
+4. Runtime register dump at the fault (+seh):
+     dispatch_exception addr=0x7BF41135  (exception record)
+     context rip=0x7BF4110C              = function ENTRY (xchgq rsp,r14)
+                                                -- record/context mismatch
+     rax=0x00000000000000de  (222; = ZwResetEvent's stub number in this
+                              build's i386 ntdll - but rax is not trustworthy
+                              given the corrupted state)
+     rdx=0x7... rcx=0x00efc665 r14=rsp=0x1000ff520
+     cs=0x002b (64-bit selector on this host - see C3)   ss=0x0000 (anomalous; normal contexts show 0x23)
+     faulting read address info[1]=0x2EC5 = the instruction's disp32 (see C2)
+   => the 64-bit gate code executed while the CPU was still in 32-bit mode:
+      the far transfer to the 64-bit code selector did not take effect.
+
+5. Cascade: after the single real fault, Wine's 64-bit unwinder walks the
+   32-bit SEH chain and calls a handler whose address is NULL (1594
+   c0000005 dispatches in total, faulting eip=0, same chain each time),
+   ending in virtual_setup_exception stack overflow. (Whether real Windows
+   would reject that handler earlier is unverified.)
+
+Conclusions
+-----------
+- The failing component is Wine's own WOW64 32->64 transition layer running
+  under Rosetta (x86-64 -> arm64 translation), not the installer's code, not
+  the triple-tested archive data, and not Wine's sync primitives (msync/
+  esync exonerated independently).
+- Config-level levers tested and all exonerated: msync/esync off, AVX
+  advertised on/off, silent installer mode, non-elevated run, Windows 7
+  version report, wined3d-vs-dxvk backend, different independent Wine build.
+- Open question: what exactly triggers the mis-translation. Before the
+  crash the thread was in a wow64 exception-context relay cycle
+  (NtQueryInformationThread/NtSetInformationThread class 29 =
+  ThreadWow64Context with size 0x2cc = sizeof(I386_CONTEXT), RtlUnwindEx
+  code 0x80000026, target wow64.dll). It is plausible that a gate entry
+  from inside an exception/relay context is the breaking case.
+  [superseded by C2/C4: the lead is the mode switch on the gate, and the
+  relay cycles look like normal callback returns]
+- [WITHDRAWN - see THIRD run] CrossOver-build relation: the frozen
+  worker thread's last traced call there was a fixme'd
+  NtQuerySystemInformation(SYSTEM_PERFORMANCE_INFORMATION), also a
+  wow64-split syscall; its silent death may be the same gate fault with the
+  exception not logged (no +seh in that earlier trace).
+
+Second instrumented run (2026-11-04 18:15, crossover-26.1.0 build, +seh,+thread,+process,+loaddll)
+------------------------------------------------------------------------------------------------
+[CONCLUSIONS OF THIS SECTION WITHDRAWN - the "wedge" was the probe loop of the
+ THIRD run, invisible without +virtual; the 100% core was the worker, not the
+ main thread. Kept for history only.]
+- Freeze reproduced identically: ~32 MB / 11 files, main thread pegged at
+  ~100% CPU. Module map: wow64cpu.dll = 0x7BF10000 (staging build used
+  0x7BF40000 - same code family, different layout).
+- ZERO exceptions raised in the setup process for the whole run (only the
+  usual harmless RPC_S_SERVER_UNAVAILABLE 6ba at boot elsewhere).
+- The extraction worker's last visible calls:
+    ... NtQuerySystemInformation(SYSTEM_PERFORMANCE_INFORMATION) [fixme]
+    ... NtQueryInformationProcess(ProcessBasicInformation)  <- logged by
+        the 64-bit side, so the thread had crossed into 64-bit Wine again
+    ... and then nothing, ever: no wait traces, no exit, no exception.
+  => the thread wedged in the 64->32 return transition (or in an untraced
+     call immediately after), never reporting anything again. All 17 host
+     threads were still ALIVE at sample time (toast: the older conclusion
+     "worker thread exited" is unproven - a wedge inside/behind the wow64
+     return gate has exactly the same observable behavior).
+- Both builds fail at a WOW64 context-transfer moment:
+    staging: hard fault INSIDE syscall_32to64 (cs32_sel load) with a
+             corrupted machine state (ss=0, record/context rip mismatch)
+    crossover: silent wedge in the return path after a successful 64-bit
+             syscall, again right after repeated
+             RtlUnwindEx(code=0x80000026 = STATUS_LONGJUMP) +
+             NtSetInformationThread(ThreadWow64Context, 0x2cc = sizeof
+             32-bit context) cycles - the very same pattern the staging
+             build showed right before its fault.
+  Common denominator: the wow64far-jump/context relay machinery under
+  Rosetta. This is the story for the upstream report.
+
+THIRD run - FULL CHANNEL SET DECODED (2026-11-04 18:25, crossover-26.1.0, +virtual,+sync,+thread,+file,+seh) - REVISED CONCLUSION
+================================================================================================================================
+Ran to freeze (34 MB / 11 files, same fingerprint), worker thread 0178.
+Log was 9.27M lines / 764MB before the kill. THE WORKER WAS NOT WEDGED IN
+THE RETURN GATE. With +virtual visible, the "silence" resolves as follows:
+
+1. Worker creates the next output file (a big .bik movie) successfully
+   (CreateFileW -> handle 0x1c4), signals its paired worker (0164/0170
+   event handshake), runs GlobalMemoryStatusEx (= the
+   NtQuerySystemInformation(SYSTEM_PERFORMANCE_INFORMATION) fixme),
+   reports 11 GB available physical.
+
+2. The installer then runs a MEMORY PROBE: NtAllocateVirtualMemory called
+   as VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_READWRITE), size
+   halving each iteration: 0x7fffffff -> 3fffffff -> ... -> 1 -> 0.
+   Every previous attempt was FREED again (VirtualFree MEM_RELEASE) -
+   i.e. it is a probe for "largest reservable block", not an allocation.
+
+3. Under Wine/macOS EVERY reservation succeeds (see excerpt-halving.log:
+   "map_view got mem" for sizes from 2GB-1 down to 512 bytes, including a
+   2GB view at 0x7fff0000-0xffff0000). Address space is never the
+   constraint, so the halving drives the size to 0.
+
+4. At size=0 VirtualAlloc fails (STATUS_INVALID_PARAMETER-ish: no
+   "map_view got mem" line), and the probe loop NEVER EXITS: it keeps
+   calling VirtualAlloc(NULL, 0, MEM_RESERVE, ...) / VirtualFree forever
+   at full CPU. The last 9.1M lines (~4.5M iterations) are exclusively
+       NtAllocateVirtualMemory (0xffffffffffffffff, 0x0, 0, 0x2000, 4)
+       NtFreeVirtualMemory   (0xffffffffffffffff, 0x0, 0, 0x8000)
+   Zero successes among the last 301,958 allocations in the last 50MB.
+   That is the 100%-CPU "freeze": one extraction worker spinning, main
+   thread stuck waiting on it. (Excerpts in games/excerpts/.)
+
+   Trace format verified against Wine master
+   (dlls/ntdll/unix/virtual.c): TRACE("%p %p %08lx %x %08x", process,
+   *ret, *size_ptr, type, protect) -> fields are addr=NULL, size,
+   type=MEM_RESERVE (0x2000), protect=PAGE_READWRITE (4).
+
+5. REINTERPRETATION OF BOTH PRIOR RUNS:
+   - The second run's "worker went silent after one 64-bit
+     NtQueryInformationProcess" was this same loop; without +virtual,
+     VirtualAlloc/VirtualFree produce no +thread/+process/+seh lines, so
+     the worker LOOKED dead/wedged. It was not in the wow64 return gate.
+   - The staging build's wow64cpu.syscall_32to64 fault remains a real,
+     SEPARATE crash, on the GUI thread (C1). The earlier claim that it
+     happened during this probe loop is withdrawn (C6): the staging run
+     has no allocation trace at all, and no rate can be stated (C8).
+
+6. Open question: what is the loop's exit test? It ignores the
+   VirtualAlloc result (C7), so it most likely compares against a value
+   computed from the GlobalMemoryStatusEx / SYSTEM_PERFORMANCE_INFORMATION
+   data read just before it. Wine fills those with sane values, but
+   AvailablePages*4096 is ~11.5 GB here and would wrap in 32-bit math - a
+   candidate trigger. Next: disassemble / +relay the extractor around those
+   calls, and compare with real Windows x64 or native Linux Wine.

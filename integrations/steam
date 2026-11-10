@@ -1,0 +1,75 @@
+#!/bin/bash
+# Decant store integration: Steam (Windows client inside a bottle).
+# Interface (docs/integrations.md, docs/adr/0010), all paths unix unless noted:
+#   steam title                -> display name
+#   steam detect <prefix>      -> Windows path of the launcher exe; exit 1 if not installed
+#   steam games  <prefix>      -> one TSV row per installed game:
+#        id  name  folder  image  target(windows)  args  match
+#      "match" is a substring of the game process's command line, for running detection.
+set -u
+
+cmd="${1:-}"; prefix="${2:-}"
+
+# Steam installs here by default; extra library folders come from libraryfolders.vdf.
+LAUNCHER_WIN='C:\Program Files (x86)\Steam\steam.exe'
+
+win_to_unix() { # windows path -> unix path inside the prefix
+  local drive rest
+  drive=$(printf '%s' "${1%%:*}" | tr '[:upper:]' '[:lower:]')
+  rest=$(printf '%s' "${1#?:}" | tr '\\' '/')
+  printf '%s/dosdevices/%s:%s' "$prefix" "$drive" "$rest"
+}
+
+steam_root() { win_to_unix 'C:\Program Files (x86)\Steam'; }
+
+# Value of a top-level "key" "value" pair in a VDF/ACF file.
+vdf_get() { # file key
+  awk -v k="\"$2\"" '$1 == k { v = $0; sub(/^[^"]*"[^"]*"[ \t]*"/, "", v); sub(/"[ \t]*$/, "", v); print v; exit }' "$1"
+}
+
+library_dirs() { # every steamapps dir (unix), default library first
+  local root vdf
+  root=$(steam_root)
+  echo "$root/steamapps"
+  vdf="$root/steamapps/libraryfolders.vdf"
+  [ -f "$vdf" ] || return 0
+  awk '$1 == "\"path\"" { v = $0; sub(/^[^"]*"[^"]*"[ \t]*"/, "", v); sub(/"[ \t]*$/, "", v); gsub(/\\\\/, "\\", v); print v }' "$vdf" |
+  while IFS= read -r p; do
+    d="$(win_to_unix "$p")/steamapps"
+    [ "$d" = "$root/steamapps" ] || echo "$d"
+  done
+}
+
+# Steam "apps" that aren't games (runtimes, redistributables, tools).
+is_tool() { case "$1" in 228980|1070560|1391110|1628350|1493710|1826330|1887720|2180100|2348590|961940) return 0;; esac; return 1; }
+
+cover_art() { # appid -> best local image for a portrait tile
+  local cache f kind
+  cache="$(steam_root)/appcache/librarycache/$1"
+  for kind in library_capsule.jpg library_600x900.jpg library_header.jpg header.jpg library_hero.jpg; do
+    f=$(find "$cache" "$(dirname "$cache")" -maxdepth 2 -name "$kind" -path "*$1*" 2>/dev/null | head -n 1)
+    [ -n "$f" ] && { printf '%s' "$f"; return; }
+  done
+}
+
+case "$cmd" in
+  title) echo "Steam";;
+  detect)
+    [ -n "$prefix" ] && [ -f "$(steam_root)/steam.exe" ] || exit 1
+    echo "$LAUNCHER_WIN";;
+  games)
+    [ -n "$prefix" ] && [ -f "$(steam_root)/steam.exe" ] || exit 0
+    library_dirs | while IFS= read -r lib; do
+      for acf in "$lib"/appmanifest_*.acf; do
+        [ -f "$acf" ] || continue
+        id=$(vdf_get "$acf" appid); name=$(vdf_get "$acf" name)
+        dir=$(vdf_get "$acf" installdir); flags=$(vdf_get "$acf" StateFlags)
+        [ -n "$id" ] || continue
+        is_tool "$id" && continue
+        [ $(( ${flags:-0} & 4 )) -ne 0 ] || continue          # 4 = fully installed
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$name" "$lib/common/$dir" "$(cover_art "$id")" \
+          "$LAUNCHER_WIN" "-applaunch $id" "\\common\\$dir\\"
+      done
+    done;;
+  *) echo "usage: steam title|detect <prefix>|games <prefix>" >&2; exit 2;;
+esac

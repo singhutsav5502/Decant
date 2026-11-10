@@ -1,0 +1,10 @@
+﻿2026-11-04 17:11:24.235   Log opened. (Time zone: UTC+05:30)
+2026-11-04 17:11:24.235   Setup version: Inno Setup version 5.5.1.ee2 (u)
+2026-11-04 17:11:24.235   Original Setup EXE: C:\decant-stage\Hades II installer-setup\setup.exe
+2026-11-04 17:11:24.235   Setup command line: /SL5="$1005A,5278995,140800,C:\decant-stage\Hades II installer-setup\setup.exe" /LOG=C:\decant-logs\20261104-171121-setup.log
+2026-11-04 17:11:24.235   Windows version: 6.2.9200  (NT platform: Yes)
+2026-11-04 17:11:24.235   64-bit Windows: Yes
+2026-11-04 17:11:24.235   Processor architecture: x64
+2026-11-04 17:11:24.235   User privileges: Administrative
+2026-11-04 17:11:24.243   64-bit install mode: No
+2026-11-04 17:11:24.243   Created temporary directory: C:\users\<user>\AppData\Local\Temp\is-UES5F.tmp

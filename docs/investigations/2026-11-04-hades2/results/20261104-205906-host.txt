@@ -1,0 +1,50 @@
+# macOS ground truth Wed Nov  4 20:59:06 IST 2026
+ProductName:		macOS
+ProductVersion:		26.6
+BuildVersion:		25G72
+arm64
+hw.memsize: 25769803776
+hw.pagesize: 16384
+hw.ncpu: 10
+hw.optional.arm64: 1
+
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                    18455.
+Pages active:                                 603129.
+Pages inactive:                               589770.
+Pages speculative:                             16604.
+Pages throttled:                                   0.
+Pages wired down:                             196066.
+Pages purgeable:                               24178.
+"Translation faults":                      858843504.
+Pages copy-on-write:                        90472184.
+Pages zero filled:                         293808088.
+Pages reactivated:                          49222860.
+Pages purged:                                4772618.
+File-backed pages:                            659869.
+Anonymous pages:                              549634.
+Pages stored in compressor:                   308703.
+Pages occupied by compressor:                  92857.
+Decompressions:                            101466028.
+Compressions:                              107308966.
+Pageins:                                    30917085.
+Pageouts:                                     604881.
+Swapins:                                    49480299.
+Swapouts:                                   50492072.
+Pages tagged:                                 118241.
+Pages tagged resident:                         95387.
+Pages tagged compressed:                       22854.
+Pages tag-storage:                             49152.
+Pages tag-storage holding tags:                 6027.
+Pages tag-storage free:                          248.
+Pages tag-storage non-tag pageable:            42780.
+Pages tag-storage non-tag wired:                  97.
+Bytes of compressed tags:                    3382080.
+Tagged compressions:                         2983844.
+Tagged decompressions:                       2824671.
+
+Pageouts: 604881 
+
+System-wide memory free percentage: 80%
+
+vm.swapusage: total = 2048.00M  used = 675.12M  free = 1372.88M  (encrypted)

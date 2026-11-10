@@ -1,0 +1,9 @@
+# Hades II (Supergiant, DirectX 12 only) under Wine on Apple Silicon.
+# Case notes, diagnosis and evidence: docs/fixes/hades2.md
+# Nothing to inject. The fix is the right exe: Ship\Hades2.exe, not Release\Hades2.exe (a dev build)
+# or F10.exe (the bug reporter). DX12 needs D3DMetal, which BACKEND=auto picks when it's imported.
+TITLE=Hades II: launch Ship\Hades2.exe (F10.exe is the bug reporter); DX12 needs D3DMetal
+MATCH=hades2.exe
+PROGRAM=Hades II|C:\Program Files\Hades II\Ship\Hades2.exe
+NOTES=docs/fixes/hades2.md
+VERIFIED=2026-11-05 crossover-26.1.0 auto->d3dmetal(GPTK-3.0) macOS-26.6 Apple-M5 (installed in the games bottle, renders to the menu next to Steam)

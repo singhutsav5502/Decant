@@ -1,0 +1,38 @@
+# Track A.2 — standalone 32-bit reproducer attempt
+
+Source: probe/repro-gate.c (new, in this bundle).
+Binary: probe/repro-gate.exe (PE32 console, i686, static, ~132 KB).
+
+What it does:
+  - Creates a window with its own WndProc.
+  - Pumps a message loop.
+  - For ~2M iterations: SendMessage(WM_NULL) into its own wndproc (window-
+    message callback into own wndproc), then setjmp/longjmp (which Wine
+    implements as RtlUnwindEx with STATUS_LONGJUMP through the wow64
+    ThreadWow64Context relay) around a VirtualAlloc/VirtualFree + Sleep(0).
+  - Prints "repro-gate: starting hammer loop" / "repro-gate: done".
+
+Run:
+  Bottle copy: vol-repro (copy of vol-test, staging-11.21 runtime).
+  WINEDEBUG=+seh,+loaddll,+process.
+  Log: bottles/vol-repro/logs/20261104-190231-54684.log (6,000,804 lines).
+
+Result:
+  - Process exited cleanly; "repro-gate: done" printed.
+  - Only the usual boot exception (code=6ba, RPC_S_SERVER_UNAVAILABLE) logged.
+  - NO c0000005, NO wow64cpu fault, NO crash at wow64cpu+0x1135.
+  - The reproducer did NOT reproduce the crash.
+
+Conclusion (inference):
+  The crash is not triggered by generic window-message + syscall + setjmp
+  traffic alone. The installer's GUI thread must be doing something more
+  specific in the relay path right before the fault (its own SEH frames,
+  a specific syscall sequence, or a particular 32-bit context shape). The
+  reproducer needs higher fidelity to the installer's actual relay usage
+  before Report 1 can be filed as self-contained. Candidates to try next:
+    - Replace setjmp/longjmp with a real __try/__except (SEH) frame around
+      the syscall, matching the installer's unwind shape.
+    - Trigger the STATUS_LONGJUMP relay with the exact ThreadWow64Context
+      size (0x2cc) by an unwind that crosses the 32/64 boundary.
+    - Drive the same path from a message handler invoked by a real
+      WM_PAINT/WM_TIMER rather than WM_NULL.

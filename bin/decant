@@ -1,0 +1,1544 @@
+#!/bin/bash
+# decant — a lightweight Wine bottle manager for macOS (Apple Silicon + Metal).
+#
+# Layout (override root with DECANT_HOME):
+#   $DECANT_HOME/runtimes/<name>/{bin,lib,share}   Wine builds (+ "<name>+<backend>" APFS clones)
+#   $DECANT_HOME/backends/<name>/                   extracted graphics layers (dxmt, dxvk, d3dmetal)
+#   $DECANT_HOME/bottles/<name>/{bottle.conf,programs.tsv,prefix,logs,cache,.fixes}
+#   $DECANT_HOME/fixes/<id>.fix                     user fix recipes (override built-in fixes/)
+#
+# Architecture and the reasons behind it: docs/ARCHITECTURE.md, docs/adr/.
+#
+# Compatible with the stock macOS bash 3.2.
+
+set -euo pipefail
+
+DECANT_VERSION="0.9.0"
+DECANT_HOME="${DECANT_HOME:-$HOME/Library/Application Support/Decant}"
+USER_DLLOVERRIDES="${WINEDLLOVERRIDES:-}"   # anything the caller set, kept across repeated bottle_env calls
+RUNTIMES="$DECANT_HOME/runtimes"
+BACKENDS="$DECANT_HOME/backends"
+BOTTLES="$DECANT_HOME/bottles"
+GLOBAL_CONF="$DECANT_HOME/decant.conf"     # Decant-wide settings (DEFAULT_BOTTLE=...)
+DOWNLOADS="$DECANT_HOME/downloads"
+
+WINE_REPO="Gcenx/macOS_Wine_builds"
+DXMT_REPO="3Shain/dxmt"
+DXVK_REPO="Gcenx/DXVK-macOS"
+
+BACKEND_NAMES="auto wined3d dxmt dxvk d3dmetal"   # auto: best layer per API, decided at launch (ADR-0019)
+
+# Helper binaries (share/ next to bin/ in the repo, or beside the CLI inside Decant.app).
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -d "$SELF_DIR/../share" ]; then SHARE="$SELF_DIR/../share"; else SHARE="$SELF_DIR/share"; fi
+if [ -d "$SELF_DIR/../fixes" ]; then BUILTIN_FIXES="$SELF_DIR/../fixes"; else BUILTIN_FIXES="$SELF_DIR/fixes"; fi
+if [ -d "$SELF_DIR/../integrations" ]; then INTEGRATIONS="$SELF_DIR/../integrations"; else INTEGRATIONS="$SELF_DIR/integrations"; fi
+SHIM64="$SHARE/decant-shim64.exe"
+SHIM32="$SHARE/decant-shim32.exe"
+ELEVATE="$SHARE/decant-elevate64.exe"
+
+# Collected from matching fix recipes by fix_apply, consumed by bottle_env/cmd_run.
+FIX_ARGS=""
+FIX_ENV=""
+FIX_DLL=""
+EFF_BACKEND=""   # the backend bottle_env actually used (BACKEND=auto resolved)
+BOOL_KEYS="RETINA MSYNC AVX METAL_HUD METALFX"
+
+# ---------------------------------------------------------------- helpers
+
+die()  { printf 'decant: %s\n' "$*" >&2; exit 1; }
+info() { printf '==> %s\n' "$*" >&2; }
+warn() { printf 'warning: %s\n' "$*" >&2; }
+
+ensure_dirs() { mkdir -p "$RUNTIMES" "$BACKENDS" "$BOTTLES" "$DOWNLOADS"; }
+
+valid_name() {
+  case "$1" in
+    ''|*/*|.*|*' '*|*+*) die "invalid name '$1' (no spaces, slashes, '+' or leading dot)";;
+  esac
+}
+
+conf_get() { # file key [default]
+  local v
+  v=$(sed -n "s/^$2=//p" "$1" 2>/dev/null | tail -n 1)
+  printf '%s' "${v:-${3:-}}"
+}
+
+# pipefail-safe "first line" / "any output": they read all input, so the
+# producer never gets SIGPIPE (which, under set -e + pipefail, aborts the CLI).
+first_line() { awk 'NR == 1'; }
+has_output() { [ -n "$(cat)" ]; }
+
+conf_all() { sed -n "s/^$2=//p" "$1" 2>/dev/null; }   # every value of a repeatable key
+
+lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+
+conf_set() { # file key value
+  local tmp="$1.tmp.$$"
+  { grep -v "^$2=" "$1" 2>/dev/null || true; printf '%s=%s\n' "$2" "$3"; } > "$tmp"
+  mv "$tmp" "$1"
+}
+
+is_true() { case "${1:-0}" in 1|y|yes|true|on) return 0;; *) return 1;; esac; }
+
+# Fetch the newest release asset of a GitHub repo whose name matches a regex.
+# Prints "<url>\t<name>".
+gh_asset() { # repo regex [tag]
+  local api="https://api.github.com/repos/$1/releases"
+  [ -n "${3:-}" ] && api="$api/tags/$3" || api="$api?per_page=10"
+  curl -fsSL "$api" | /usr/bin/python3 -c '
+import json, re, sys
+data = json.load(sys.stdin)
+rels = data if isinstance(data, list) else [data]
+pat = re.compile(sys.argv[1])
+for rel in rels:
+    for a in rel.get("assets", []):
+        if pat.search(a["name"]):
+            print(a["browser_download_url"] + "\t" + a["name"]); sys.exit(0)
+sys.exit(1)' "$2" || die "no release asset matching '$2' in $1"
+}
+
+download() { # url dest
+  if [ -s "$2" ]; then info "using cached $(basename "$2")"; return; fi
+  info "downloading $(basename "$2")"
+  curl -fL --progress-bar -o "$2.part" "$1"
+  mv "$2.part" "$2"
+}
+
+extract_to() { # archive dir
+  rm -rf "$2"; mkdir -p "$2"
+  tar -xf "$1" -C "$2"
+  xattr -dr com.apple.quarantine "$2" 2>/dev/null || true
+}
+
+# Wine executable inside a runtime (Wine >= 10 ships "wine" with new WoW64; older ones "wine64").
+wine_bin() {
+  local r="$1"
+  if [ -x "$r/bin/wine" ]; then echo "$r/bin/wine"
+  elif [ -x "$r/bin/wine64" ]; then echo "$r/bin/wine64"
+  else die "no wine binary in $r/bin"; fi
+}
+
+wine_libdir() { # runtime -> lib/wine
+  local d
+  for d in "$1/lib/wine" "$1/lib64/wine"; do [ -d "$d" ] && { echo "$d"; return; }; done
+  die "no lib/wine directory in $1"
+}
+
+# DXMT presents through Wine's macOS driver: winemetal.so dlsym()s the
+# `macdrv_functions` table that CrossOver's winemac.so exports (d3dmetal.c).
+# Prebuilt Gcenx Wine strips it, so DXMT renders nothing there (docs/adr/0011).
+# "_macdrv_functions" is the exported Mach-O symbol name; a plain string
+# search finds it without needing Xcode's nm.
+runtime_supports_dxmt() { # runtime-dir
+  LC_ALL=C grep -qa _macdrv_functions "$1/lib/wine/x86_64-unix/winemac.so" 2>/dev/null
+}
+
+# New bottles: BACKEND=auto, resolved at every launch (ADR-0019).
+default_backend() { echo auto; }
+
+# What BACKEND=auto means on this runtime right now. DX10-12 + DXGI come from one layer (they
+# share dxgi.dll): D3DMetal if imported, else DXMT; both need a runtime with the macdrv exports.
+# DX9 and older, DirectDraw and OpenGL stay on Wine's wined3d; Vulkan goes to MoltenVK.
+# DXVK only when the runtime can't present with Metal (e.g. prebuilt staging, ADR-0011).
+resolve_backend() { # runtime-name
+  if runtime_supports_dxmt "$RUNTIMES/$1"; then
+    if [ -d "$BACKENDS/d3dmetal" ]; then echo d3dmetal; return; fi
+    if [ -d "$BACKENDS/dxmt" ]; then echo dxmt; return; fi
+  fi
+  if [ -d "$BACKENDS/dxvk" ]; then echo dxvk; else echo wined3d; fi
+}
+
+need_backend_ok() { # runtime-name backend
+  case "$2" in
+    dxmt) runtime_supports_dxmt "$RUNTIMES/$1" || die "runtime $1 can't run DXMT (its winemac.so doesn't export the metal-view functions DXMT needs). Use BACKEND=auto, or a Wine built with scripts/build-wine.sh (docs/adr/0011)";;
+    d3dmetal) runtime_supports_dxmt "$RUNTIMES/$1" || die "runtime $1 can't run D3DMetal (it needs the same macOS-driver exports as DXMT; see: decant runtime list). Use BACKEND=auto, or a CrossOver-based runtime (docs/adr/0019)";;
+  esac
+  return 0
+}
+
+bottle_dir()  { echo "$BOTTLES/$1"; }
+
+# The bottle new games, installers and store launchers go to unless told
+# otherwise: DEFAULT_BOTTLE in decant.conf if it still exists, else the only bottle.
+default_bottle() {
+  local d c n=0 only=""
+  d=$(conf_get "$GLOBAL_CONF" DEFAULT_BOTTLE)
+  if [ -n "$d" ] && [ -f "$BOTTLES/$d/bottle.conf" ]; then echo "$d"; return 0; fi
+  for c in "$BOTTLES"/*/bottle.conf; do [ -f "$c" ] && { n=$((n + 1)); only=$(basename "$(dirname "$c")"); }; done
+  [ "$n" = 1 ] && echo "$only"
+  return 0
+}
+bottle_conf() { echo "$BOTTLES/$1/bottle.conf"; }
+need_bottle() { [ -f "$(bottle_conf "$1")" ] || die "no bottle named '$1' (see: decant bottle list)"; }
+
+# Runtime for new bottles: the first DXMT-capable one (ADR-0011/0012), else the
+# first installed. Override per bottle with --runtime.
+default_runtime() {
+  local r first=""
+  for r in "$RUNTIMES"/*; do
+    [ -d "$r" ] || continue
+    case "$(basename "$r")" in *+*) continue;; esac
+    [ -n "$first" ] || first=$(basename "$r")
+    if runtime_supports_dxmt "$r"; then basename "$r"; return; fi
+  done
+  [ -n "$first" ] && echo "$first"
+  return 0
+}
+
+# ---------------------------------------------------------------- setup
+
+# The recommended setup (ADR-0023), defined once so the CLI, the app and the docs agree:
+# a Metal-capable CrossOver Wine, DXMT + DXVK (+ D3DMetal if the user has GPTK), and one
+# default bottle "games" with the bottle_create defaults (BACKEND=auto, win10, msync, AVX).
+SETUP_BOTTLE="games"
+SETUP_WINE_MODE="crossover"
+SETUP_WINE_VERSION="26.1.0"
+
+has_metal_runtime() {
+  local r
+  for r in "$RUNTIMES"/*; do
+    [ -d "$r" ] || continue
+    case "$(basename "$r")" in *+*) continue;; esac
+    if runtime_supports_dxmt "$r"; then return 0; fi
+  done
+  return 1
+}
+
+# Every step is skipped when already done, so setup is safe to re-run; it never changes an
+# existing bottle's settings or a default bottle the user picked.
+cmd_setup() { # [--build-wine] [--gptk <dir>]
+  local build=0 gptk="" b rt def
+  local usage="usage: decant setup [--build-wine] [--gptk <GPTK dir>]"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --build-wine) build=1; shift;;
+      --gptk) [ -n "${2:-}" ] || die "$usage"; gptk="$2"; shift 2;;
+      -h|--help) echo "$usage"; return 0;;
+      *) die "$usage";;
+    esac
+  done
+  ensure_dirs
+
+  # 1. A prebuilt Wine: runs games on its own, and build-wine.sh borrows its x86_64 libraries.
+  if [ -n "$(default_runtime)" ]; then
+    info "1/5 Wine runtime: $(default_runtime) (installed)"
+  else
+    info "1/5 Wine runtime: downloading prebuilt Wine Staging (~220 MB)"
+    runtime_install staging >/dev/null
+  fi
+
+  # 2. CrossOver's open-source Wine, built locally: needed for DXMT, D3DMetal and the
+  #    Decant patches (ADR-0012, ADR-0015). Takes 15-40 minutes, so only on request.
+  if has_metal_runtime; then
+    info "2/5 Metal-capable Wine: $(default_runtime) (installed)"
+  elif [ "$build" = 1 ]; then
+    local script="$SELF_DIR/../scripts/build-wine.sh"
+    [ -x "$script" ] || die "scripts/build-wine.sh isn't here (the app doesn't bundle it); run setup from a Decant source checkout"
+    info "2/5 Metal-capable Wine: building $SETUP_WINE_MODE $SETUP_WINE_VERSION (15-40 min)"
+    DECANT_HOME="$DECANT_HOME" "$script" "$SETUP_WINE_MODE" "$SETUP_WINE_VERSION"
+  else
+    warn "2/5 no Metal-capable Wine yet: games will use DXVK. For DXMT/D3DMetal, run from a source checkout: decant setup --build-wine"
+  fi
+
+  # 3. Graphics backends BACKEND=auto picks from at launch (ADR-0019).
+  for b in dxmt dxvk; do
+    if [ -d "$BACKENDS/$b" ]; then info "3/5 backend $b (installed)"
+    else info "3/5 backend $b: downloading"; backend_install "$b"; fi
+  done
+
+  # 4. D3DMetal (DirectX 12): never downloaded, only imported from the user's own GPTK.
+  if [ -d "$BACKENDS/d3dmetal" ]; then info "4/5 backend d3dmetal (installed)"
+  elif [ -n "$gptk" ]; then info "4/5 backend d3dmetal: importing from $gptk"; backend_install d3dmetal "$gptk"
+  else info "4/5 backend d3dmetal: skipped (for DirectX 12: decant setup --gptk <GPTK dir>)"; fi
+
+  # 5. The default bottle.
+  if [ -f "$(bottle_conf "$SETUP_BOTTLE")" ]; then
+    info "5/5 bottle $SETUP_BOTTLE (exists, settings unchanged)"
+    rt=$(conf_get "$(bottle_conf "$SETUP_BOTTLE")" RUNTIME)
+    if ! runtime_supports_dxmt "$RUNTIMES/$rt" && has_metal_runtime; then
+      warn "bottle $SETUP_BOTTLE is on $rt, which can't use Metal. To move it: decant bottle set $SETUP_BOTTLE RUNTIME=$(default_runtime)"
+    fi
+    def=$(conf_get "$GLOBAL_CONF" DEFAULT_BOTTLE)
+    if [ -z "$def" ] || [ ! -f "$(bottle_conf "$def")" ]; then cmd_bottle default "$SETUP_BOTTLE"
+    elif [ "$def" != "$SETUP_BOTTLE" ]; then info "default bottle stays $def (switch: decant bottle default $SETUP_BOTTLE)"; fi
+  else
+    info "5/5 bottle $SETUP_BOTTLE: creating"
+    def=$(conf_get "$GLOBAL_CONF" DEFAULT_BOTTLE)
+    if [ -n "$def" ] && [ -f "$(bottle_conf "$def")" ]; then
+      bottle_create "$SETUP_BOTTLE"
+      info "default bottle stays $def (switch: decant bottle default $SETUP_BOTTLE)"
+    else
+      bottle_create "$SETUP_BOTTLE" --default
+    fi
+  fi
+  info "setup done. Next: decant install $SETUP_BOTTLE steam, or add a game in Decant.app"
+}
+
+# ---------------------------------------------------------------- doctor
+
+cmd_doctor() {
+  local ok=0
+  echo "decant $DECANT_VERSION — home: $DECANT_HOME"
+  printf 'Default      %s\n' "$(default_bottle | awk '{ print } END { if (!NR) print "(none: decant bottle default <name>)" }')"
+  printf 'macOS        %s (%s)\n' "$(sw_vers -productVersion)" "$(uname -m)"
+  if [ "$(uname -m)" = arm64 ]; then
+    if /usr/bin/pgrep -q oahd || pkgutil --pkg-info com.apple.pkg.RosettaUpdateAuto >/dev/null 2>&1; then
+      echo "Rosetta 2    installed"
+    else
+      echo "Rosetta 2    MISSING  -> run: softwareupdate --install-rosetta --agree-to-license"; ok=1
+    fi
+  fi
+  local n=0 r
+  for r in "$RUNTIMES"/*; do [ -d "$r" ] && case "$r" in *+*) ;; *) n=$((n+1));; esac; done
+  if [ "$n" -gt 0 ]; then echo "Runtimes     $n (default: $(default_runtime))"
+    for r in "$RUNTIMES"/*; do
+      case "$(basename "$r")" in *+*) continue;; esac
+      if runtime_supports_dxmt "$r"; then echo "  $(basename "$r"): DXMT capable"
+      else echo "  $(basename "$r"): no DXMT (use dxvk; see docs/adr/0011)"; fi
+    done
+  else echo "Runtimes     none     -> run: decant runtime install"; ok=1; fi
+  local b
+  for b in dxmt dxvk d3dmetal; do
+    if [ -d "$BACKENDS/$b" ]; then printf 'Backend      %-9s installed\n' "$b"
+    else printf 'Backend      %-9s not installed\n' "$b"; fi
+  done
+  if [ -n "$(default_runtime)" ]; then
+    if find "$RUNTIMES/$(default_runtime)" -name 'libMoltenVK.dylib' | has_output; then
+      echo "MoltenVK     bundled with runtime (DXVK ok)"
+    else
+      echo "MoltenVK     not in runtime (DXVK backend will need it)"
+    fi
+  fi
+  return $ok
+}
+
+# ---------------------------------------------------------------- runtimes
+
+cmd_runtime() {
+  local sub="${1:-list}"; shift || true
+  case "$sub" in
+    list)    runtime_list;;
+    install) runtime_install "$@";;
+    import)  runtime_import "$@";;
+    remove)  runtime_remove "$@";;
+    *) die "usage: decant runtime list|install [devel|staging] [version]|import <dir> <name>|remove <name>";;
+  esac
+}
+
+runtime_list() {
+  local r name
+  for r in "$RUNTIMES"/*; do
+    [ -d "$r" ] || continue
+    name=$(basename "$r")
+    case "$name" in *+*) continue;; esac
+    # name, source, dxmt-capable (yes/no) — the app reads the 3rd column
+    printf '%s\t%s\t%s\n' "$name" "$(cat "$r/.decant-source" 2>/dev/null || echo local)" \
+      "$(runtime_supports_dxmt "$r" && echo yes || echo no)"
+  done
+}
+
+runtime_install() { # [flavor] [version]
+  ensure_dirs
+  local flavor="${1:-staging}" version="${2:-}" asset url file name tmp src
+  case "$flavor" in devel|staging) ;; *) die "flavor must be devel or staging";; esac
+  if [ -n "$version" ]; then asset=$(gh_asset "$WINE_REPO" "^wine-$flavor-$version-osx64" "$version")
+  else asset=$(gh_asset "$WINE_REPO" "^wine-$flavor-.*-osx64\\.tar\\.xz$"); fi
+  url=${asset%%$'\t'*}; file=${asset#*$'\t'}
+  name=$(echo "$file" | sed -E 's/^wine-//; s/-osx64.*//')       # e.g. staging-11.21
+  [ -d "$RUNTIMES/$name" ] && { info "runtime $name already installed"; echo "$name"; return; }
+  download "$url" "$DOWNLOADS/$file"
+  tmp="$DOWNLOADS/extract.$$"; extract_to "$DOWNLOADS/$file" "$tmp"
+  # Gcenx tarballs contain "Wine <Flavor>.app/Contents/Resources/wine"
+  src=$(find "$tmp" -type d -path '*Contents/Resources/wine' -maxdepth 4 | first_line)
+  [ -n "$src" ] || src="$tmp"
+  mv "$src" "$RUNTIMES/$name"
+  rm -rf "$tmp"
+  echo "$url" > "$RUNTIMES/$name/.decant-source"
+  info "installed runtime $name"
+  echo "$name"
+}
+
+runtime_import() { # dir name   (e.g. a self-built Wine prefix dir, or a Wine.app)
+  ensure_dirs
+  local dir="${1:-}" name="${2:-}"
+  [ -n "$dir" ] && [ -n "$name" ] || die "usage: decant runtime import <wine-dir|Wine.app> <name>"
+  valid_name "$name"
+  [ -d "$dir/Contents/Resources/wine" ] && dir="$dir/Contents/Resources/wine"
+  [ -x "$dir/bin/wine" ] || [ -x "$dir/bin/wine64" ] || die "$dir has no bin/wine"
+  [ -e "$RUNTIMES/$name" ] && die "runtime $name exists"
+  cp -cR "$dir" "$RUNTIMES/$name" 2>/dev/null || cp -R "$dir" "$RUNTIMES/$name"
+  echo "imported from $1" > "$RUNTIMES/$name/.decant-source"
+  info "imported runtime $name"
+}
+
+runtime_remove() {
+  local name="${1:-}"; [ -n "$name" ] || die "usage: decant runtime remove <name>"
+  [ -d "$RUNTIMES/$name" ] || die "no runtime $name"
+  rm -rf "$RUNTIMES/$name" "$RUNTIMES/$name"+*
+  info "removed runtime $name (and its backend clones)"
+}
+
+# A backend like DXMT or D3DMetal ships *builtin* DLLs plus unix-side .so/.dylib
+# files that must live inside Wine's own lib dir. Rather than mutating the base
+# runtime, make an APFS clone (cp -c: instant, zero extra disk) and overlay it.
+runtime_with_backend() { # runtime backend -> dir
+  local base="$RUNTIMES/$1" b="$2" dest="$RUNTIMES/$1+$2" stamp
+  [ -d "$base" ] || die "no runtime $1 (see: decant runtime list)"
+  [ -d "$BACKENDS/$b" ] || die "backend $b not installed (run: decant backend install $b)"
+  stamp="$(cat "$BACKENDS/$b/.decant-version" 2>/dev/null || echo 0)"
+  if [ -d "$dest" ] && [ "$(cat "$dest/.decant-overlay" 2>/dev/null)" = "$b $stamp" ]; then
+    echo "$dest"; return
+  fi
+  info "preparing runtime clone $1+$2"
+  rm -rf "$dest"
+  cp -cR "$base" "$dest" 2>/dev/null || cp -R "$base" "$dest"
+  local lib arch src
+  lib=$(wine_libdir "$dest")
+  for arch in x86_64-windows i386-windows x86_64-unix i386-unix; do
+    src=$(find "$BACKENDS/$b" -type d -name "$arch" | first_line)
+    [ -n "$src" ] || continue
+    mkdir -p "$lib/$arch"
+    cp -R "$src/" "$lib/$arch/"
+  done
+  # D3DMetal's Metal-side framework and helper dylib live next to wine's lib dir.
+  if [ "$b" = d3dmetal ]; then
+    mkdir -p "$dest/lib/external"
+    find "$BACKENDS/$b" -maxdepth 4 \( -name 'D3DMetal.framework' -o -name 'libd3dshared.dylib' \) \
+      -exec cp -R {} "$dest/lib/external/" \;
+  fi
+  echo "$b $stamp" > "$dest/.decant-overlay"
+  echo "$dest"
+}
+
+# ---------------------------------------------------------------- backends
+
+cmd_backend() {
+  local sub="${1:-list}"; shift || true
+  case "$sub" in
+    list)
+      local b
+      for b in $BACKEND_NAMES; do
+        [ "$b" = auto ] && continue   # a choice, not a component
+        if [ "$b" = wined3d ] || [ -d "$BACKENDS/$b" ]; then
+          printf '%s\tinstalled\t%s\n' "$b" "$(cat "$BACKENDS/$b/.decant-version" 2>/dev/null || echo builtin)"
+        else
+          printf '%s\tmissing\t-\n' "$b"
+        fi
+      done;;
+    install) backend_install "$@";;
+    remove)  [ -n "${1:-}" ] || die "usage: decant backend remove <name>"
+             rm -rf "${BACKENDS:?}/$1" "$RUNTIMES"/*+"$1"; info "removed $1";;
+    *) die "usage: decant backend list|install dxmt|dxvk|d3dmetal <GPTK-dir>|remove <name>";;
+  esac
+}
+
+backend_install() {
+  ensure_dirs
+  local b="${1:-}" asset url file
+  case "$b" in
+    dxmt)
+      asset=$(gh_asset "$DXMT_REPO" '^dxmt-.*-builtin\.tar\.gz$');;
+    dxvk)
+      asset=$(gh_asset "$DXVK_REPO" '^dxvk-macOS-async-v[0-9.]+-[0-9]+(-repack)?\.tar\.gz$');;
+    d3dmetal)
+      backend_install_d3dmetal "${2:-}"; return;;
+    *) die "usage: decant backend install dxmt|dxvk|d3dmetal <path>";;
+  esac
+  url=${asset%%$'\t'*}; file=${asset#*$'\t'}
+  download "$url" "$DOWNLOADS/$file"
+  extract_to "$DOWNLOADS/$file" "$BACKENDS/$b"
+  echo "$file" > "$BACKENDS/$b/.decant-version"
+  info "installed backend $b ($file)"
+}
+
+# D3DMetal is Apple's closed-source layer from the Game Porting Toolkit. Its
+# licence does not allow us to download/redistribute it, so the user points us
+# at their own copy (the mounted GPTK .dmg or its "redist" folder).
+backend_install_d3dmetal() {
+  local src="${1:-}"
+  [ -n "$src" ] || die "usage: decant backend install d3dmetal <path to mounted Game Porting Toolkit volume or its redist/lib folder>"
+  [ -d "$src" ] || die "$src is not a directory"
+  local fw
+  fw=$(find "$src" -maxdepth 5 -name 'D3DMetal.framework' -type d | first_line)
+  [ -n "$fw" ] || die "D3DMetal.framework not found under $src"
+  local root; root=$(dirname "$(dirname "$fw")")    # .../lib  (external/ and wine/ live here)
+  rm -rf "$BACKENDS/d3dmetal"; mkdir -p "$BACKENDS/d3dmetal"
+  cp -R "$root/" "$BACKENDS/d3dmetal/"
+  echo "gptk:$(basename "$src")" > "$BACKENDS/d3dmetal/.decant-version"
+  info "installed backend d3dmetal from $src"
+}
+
+# ---------------------------------------------------------------- bottles
+
+cmd_bottle() {
+  local sub="${1:-list}"; shift || true
+  case "$sub" in
+    list)   bottle_list;;
+    create) bottle_create "$@";;
+    delete) bottle_delete "$@";;
+    show)   need_bottle "${1:-}"; cat "$(bottle_conf "$1")";;
+    set)    bottle_set "$@";;
+    path)   need_bottle "${1:-}"; echo "$(bottle_dir "$1")/prefix/drive_c";;
+    default)
+      if [ -z "${1:-}" ]; then default_bottle; return 0; fi
+      need_bottle "$1"; mkdir -p "$DECANT_HOME"; touch "$GLOBAL_CONF"
+      conf_set "$GLOBAL_CONF" DEFAULT_BOTTLE "$1"; info "default bottle: $1";;
+    *) die "usage: decant bottle list|create <name> [--runtime R] [--backend B] [--default]|delete <name>|show <name>|set <name> KEY=VALUE...|path <name>|default [name]";;
+  esac
+}
+
+bottle_list() { # name runtime backend [default]
+  local c def; def=$(default_bottle)
+  for c in "$BOTTLES"/*/bottle.conf; do
+    [ -f "$c" ] || continue
+    printf '%s\t%s\t%s\t%s\n' "$(conf_get "$c" NAME)" "$(conf_get "$c" RUNTIME)" "$(conf_get "$c" BACKEND)" \
+      "$([ "$(conf_get "$c" NAME)" = "$def" ] && echo default)"
+  done
+}
+
+bottle_create() {
+  ensure_dirs
+  local name="${1:-}"; shift || true
+  [ -n "$name" ] || die "usage: decant bottle create <name> [--runtime R] [--backend B] [--winver win10]"
+  valid_name "$name"
+  local runtime="" backend="" winver="win10" makedefault=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --runtime) runtime="$2"; shift 2;;
+      --backend) backend="$2"; shift 2;;
+      --winver)  winver="$2"; shift 2;;
+      --default) makedefault=1; shift;;
+      *) die "unknown option $1";;
+    esac
+  done
+  [ -n "$runtime" ] || runtime=$(default_runtime)
+  [ -n "$runtime" ] || die "no runtime installed (run: decant runtime install)"
+  [ -n "$backend" ] || backend=$(default_backend "$runtime")
+  need_backend_ok "$runtime" "$backend"
+  local d; d=$(bottle_dir "$name")
+  [ -e "$d" ] && die "bottle $name already exists"
+  mkdir -p "$d/logs" "$d/cache"
+  local c="$d/bottle.conf"
+  cat > "$c" <<EOF
+NAME=$name
+RUNTIME=$runtime
+BACKEND=$backend
+WINVER=$winver
+RETINA=0
+MSYNC=1
+AVX=1
+METAL_HUD=0
+METALFX=0
+WINEDEBUG=-all
+EXTRA_ENV=
+EOF
+  : > "$d/programs.tsv"
+  info "initialising Wine prefix (first run takes a minute)"
+  run_wine "$name" --wait wineboot --init
+  bottle_apply "$name"
+  [ "$makedefault" = 1 ] && cmd_bottle default "$name"
+  info "bottle $name ready — C: drive at $d/prefix/drive_c"
+}
+
+bottle_delete() {
+  local name="${1:-}"; need_bottle "$name"
+  kill_bottle "$name" 2>/dev/null || true
+  rm -rf "$(bottle_dir "$name")"
+  [ "$(conf_get "$GLOBAL_CONF" DEFAULT_BOTTLE)" = "$name" ] && conf_set "$GLOBAL_CONF" DEFAULT_BOTTLE ""
+  info "deleted bottle $name"
+}
+
+bottle_set() { # name KEY=VALUE ...
+  local name="${1:-}"; need_bottle "$name"; shift
+  [ $# -gt 0 ] || die "usage: decant bottle set <name> KEY=VALUE ..."
+  local c; c=$(bottle_conf "$name")
+  local kv key val
+  for kv in "$@"; do
+    key=${kv%%=*}; val=${kv#*=}
+    case "$key" in
+      BACKEND) case " $BACKEND_NAMES " in *" $val "*) ;; *) die "BACKEND must be one of: $BACKEND_NAMES";; esac
+               need_backend_ok "$(conf_get "$c" RUNTIME)" "$val";;
+      RUNTIME) [ -d "$RUNTIMES/$val" ] || die "no runtime $val";;
+      WINVER|WINEDEBUG|EXTRA_ENV) ;;
+      RETINA|MSYNC|AVX|METAL_HUD|METALFX) case "$val" in 0|1) ;; *) die "$key must be 0 or 1";; esac;;
+      *) die "unknown key $key";;
+    esac
+    conf_set "$c" "$key" "$val"
+  done
+  bottle_apply "$name"
+}
+
+# Push settings that live inside the prefix (registry, DLLs) rather than env.
+bottle_apply() {
+  local name="$1" c; c=$(bottle_conf "$name")
+  local backend; backend=$(conf_get "$c" BACKEND)
+  local retina=n; is_true "$(conf_get "$c" RETINA)" && retina=y
+  run_wine "$name" --wait reg add 'HKCU\Software\Wine\Mac Driver' /v RetinaMode /t REG_SZ /d "$retina" /f >/dev/null
+  run_wine "$name" --wait winecfg -v "$(conf_get "$c" WINVER win10)" >/dev/null
+  local rt; rt=$(conf_get "$c" RUNTIME)
+  [ "$backend" = auto ] && backend=$(resolve_backend "$rt")
+  dxvk_sync "$name" "$backend" "$rt"
+}
+
+# DXVK ships *native* PE DLLs, so they live in the prefix (.dxvk-dlls lists them) exactly while the
+# effective backend is DXVK. With BACKEND=auto that can change at launch (a runtime or backend change).
+dxvk_sync() { # bottle effective-backend runtime
+  local name="$1" sys32 wow
+  sys32="$(bottle_dir "$name")/prefix/drive_c/windows/system32"
+  wow="$(bottle_dir "$name")/prefix/drive_c/windows/syswow64"
+  if [ "$2" = dxvk ]; then
+    [ -f "$(bottle_dir "$name")/.dxvk-dlls" ] && return 0
+    [ -d "$BACKENDS/dxvk" ] || die "backend dxvk not installed (run: decant backend install dxvk)"
+    local x64 x32 f
+    x64=$(find "$BACKENDS/dxvk" -type d -name x64 | first_line)
+    x32=$(find "$BACKENDS/dxvk" -type d -name x32 | first_line)
+    # Replace (unlink, then copy), never overwrite in place: a running process may have the old file mapped.
+    [ -n "$x64" ] && for f in "$x64"/*.dll; do rm -f "$sys32/$(basename "$f")"; cp "$f" "$sys32/"; done
+    [ -n "$x32" ] && [ -d "$wow" ] && for f in "$x32"/*.dll; do rm -f "$wow/$(basename "$f")"; cp "$f" "$wow/"; done
+    (cd "$x64" && ls *.dll) > "$(bottle_dir "$name")/.dxvk-dlls"
+  elif [ -f "$(bottle_dir "$name")/.dxvk-dlls" ]; then
+    # Leaving DXVK: put Wine's own DLLs back so they don't shadow the new backend.
+    local lib dll; lib=$(wine_libdir "$RUNTIMES/$3")
+    while read -r dll; do
+      [ -f "$lib/x86_64-windows/$dll" ] && { rm -f "$sys32/$dll"; cp "$lib/x86_64-windows/$dll" "$sys32/$dll"; }
+      [ -f "$lib/i386-windows/$dll" ] && [ -d "$wow" ] && { rm -f "$wow/$dll"; cp "$lib/i386-windows/$dll" "$wow/$dll"; }
+    done < "$(bottle_dir "$name")/.dxvk-dlls"
+    rm -f "$(bottle_dir "$name")/.dxvk-dlls"
+  fi
+  return 0
+}
+
+# ---------------------------------------------------------------- running
+
+# Build the environment for a bottle and exec wine. Everything that makes the
+# Metal path fast is decided here.
+bottle_env() { # name -> exports into current shell; prints runtime dir
+  local name="$1" c; c=$(bottle_conf "$name")
+  local backend runtime rt
+  backend=$(conf_get "$c" BACKEND wined3d)
+  runtime=$(conf_get "$c" RUNTIME)
+  if [ "$backend" = auto ]; then
+    backend=$(resolve_backend "$runtime")
+    [ -d "$(bottle_dir "$name")/prefix/drive_c/windows/system32" ] && dxvk_sync "$name" "$backend" "$runtime"
+  fi
+  EFF_BACKEND="$backend"
+  case "$backend" in
+    dxmt|d3dmetal) rt=$(runtime_with_backend "$runtime" "$backend");;
+    *)             rt="$RUNTIMES/$runtime"; [ -d "$rt" ] || die "no runtime $runtime";;
+  esac
+
+  export WINEPREFIX="$(bottle_dir "$name")/prefix"
+  export WINEDEBUG="$(conf_get "$c" WINEDEBUG -all)"
+  export PATH="$rt/bin:$PATH"
+  # Lets winevulkan find MoltenVK and D3DMetal find its framework.
+  export DYLD_FALLBACK_LIBRARY_PATH="$rt/lib:$rt/lib/external:/usr/local/lib:/usr/lib"
+  local cache; cache="$(bottle_dir "$name")/cache"
+  export MVK_CONFIG_LOG_LEVEL="${MVK_CONFIG_LOG_LEVEL:-1}"   # MoltenVK: errors only
+  # CrossOver Wine reports every user as "crossover" (its "Hack 12735") while
+  # ntdll still uses $USER for C:\users\<name>, so apps lose saved logins and
+  # saves when a bottle moves between runtimes. Report the real name everywhere.
+  # Other Wine builds ignore this variable.
+  export CX_REPORT_REAL_USERNAME=1
+  # patches/crossover/0002: reserve 0xfffd0000 in large-address-aware 32-bit processes, as upstream
+  # Wine does, so FreeArc-based installers don't loop forever (ADR-0020). Other Wine builds ignore it.
+  export DECANT_WOW64_RESERVE_TOP=1
+
+  case "$backend" in
+    dxmt)
+      runtime_supports_dxmt "$RUNTIMES/$runtime" || warn "runtime $runtime can't run DXMT; games will fail to render (decant bottle set $name BACKEND=dxvk)"
+      export WINEDLLOVERRIDES="dxgi,d3d11,d3d10core=b${USER_DLLOVERRIDES:+;$USER_DLLOVERRIDES}"
+      export DXMT_SHADER_CACHE_PATH="$cache/dxmt"   # persistent translated-shader cache: less stutter on 2nd run
+      mkdir -p "$DXMT_SHADER_CACHE_PATH"
+      if is_true "$(conf_get "$c" METALFX)"; then
+        export DXMT_METALFX_SPATIAL_SWAPCHAIN=1     # render low-res, MetalFX-upscale at present
+        export DXMT_ENABLE_NVEXT=1                  # expose NVAPI so DLSS-capable games can use it
+      fi;;
+    d3dmetal)
+      export WINEDLLOVERRIDES="dxgi,d3d11,d3d12,d3d10core=b${USER_DLLOVERRIDES:+;$USER_DLLOVERRIDES}"
+      is_true "$(conf_get "$c" METALFX)" && export D3DM_ENABLE_METALFX=1;;
+    dxvk)
+      # Override exactly the DLLs this DXVK build ships (DXVK-macOS has no dxgi; Wine's own is used).
+      local dlls
+      dlls=$(find "$BACKENDS/dxvk" -path '*/x64/*.dll' -exec basename {} .dll \; 2>/dev/null | sort | paste -sd, -)
+      export WINEDLLOVERRIDES="${dlls:-d3d11}=n,b${USER_DLLOVERRIDES:+;$USER_DLLOVERRIDES}"
+      export DXVK_ASYNC=1                       # compile pipelines off the render thread (less stutter)
+      export DXVK_STATE_CACHE_PATH="$cache"
+      export MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS=1
+      export MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS=0
+      export MVK_CONFIG_FAST_MATH_ENABLED=1
+      export MVK_CONFIG_RESUME_LOST_DEVICE=1;;
+    wined3d)
+      export WINEDLLOVERRIDES="dxgi,d3d9,d3d10core,d3d11=b${USER_DLLOVERRIDES:+;$USER_DLLOVERRIDES}";;
+  esac
+
+  is_true "$(conf_get "$c" MSYNC 1)" && { export WINEMSYNC=1; export WINEESYNC=1; }
+  is_true "$(conf_get "$c" AVX 1)" && export ROSETTA_ADVERTISE_AVX=1
+  is_true "$(conf_get "$c" METAL_HUD 0)" && export MTL_HUD_ENABLED=1
+
+  # Free-form "K=V K2=V2" for per-game tweaks.
+  local extra kv; extra=$(conf_get "$c" EXTRA_ENV)
+  for kv in $extra; do case "$kv" in *=*) export "$kv";; esac; done
+
+  # Contributions from fix recipes (fix_apply) come last so they win.
+  [ -n "$FIX_DLL" ] && export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:+$WINEDLLOVERRIDES;}$FIX_DLL"
+  local line
+  while IFS= read -r line; do case "$line" in *=*) export "$line";; esac; done <<EOF
+$FIX_ENV
+EOF
+
+  RT_DIR="$rt"
+}
+
+run_wine() { # name [--wait] args...
+  local name="$1"; shift
+  local wait=0; [ "${1:-}" = --wait ] && { wait=1; shift; }
+  need_bottle "$name"
+  RT_DIR=""
+  bottle_env "$name"
+  local wine; wine=$(wine_bin "$RT_DIR")
+  if [ $wait = 1 ]; then
+    "$wine" "$@"
+    "$RT_DIR/bin/wineserver" -w 2>/dev/null || true
+  else
+    local log; log="$(bottle_dir "$name")/logs/$(date +%Y%m%d-%H%M%S)-$$.log"
+    ln -sf "$log" "$(bottle_dir "$name")/logs/latest.log"
+    {
+      echo "# decant run $(date)"; echo "# runtime: $RT_DIR"; echo "# backend: $EFF_BACKEND"; echo "# cmd: $*"
+      local a; for a in "$@"; do case "$a" in *'C:\decant-logs\'*)
+        echo "# installer-log: $(bottle_dir "$name")/prefix/drive_c/decant-logs/${a##*\\}";; esac; done
+      env | grep -E '^(WINE|DXVK|DXMT|MVK|MTL|D3DM|ROSETTA|CX_|DECANT_WOW64)' | sort | sed 's/^/# /'
+    } > "$log"
+    # Not nohup: /usr/bin/nohup is SIP-protected, so macOS strips DYLD_* from it and
+    # wineserver then can't find the runtime's dylibs (e.g. libinotify) on a cold start.
+    # A subshell that ignores SIGHUP and execs wine keeps the environment intact.
+    ( trap '' HUP; exec "$wine" "$@" ) >> "$log" 2>&1 < /dev/null &
+    echo "pid $!  log $log"
+  fi
+}
+
+cmd_run() { # [--admin] bottle exe|cmd [args]
+  local admin=0
+  [ "${1:-}" = --admin ] && { admin=1; shift; }
+  local name="${1:-}" target="${2:-}"
+  [ -n "$name" ] && [ -n "$target" ] || die "usage: decant run [--admin] <bottle> <program.exe|windows-path|label> [args...]"
+  shift 2
+  need_bottle "$name"
+  # A saved program label?
+  # programs.tsv: label<TAB>path[<TAB>default args, space-separated]
+  local tsv saved savedargs
+  tsv="$(bottle_dir "$name")/programs.tsv"
+  saved=$(awk -F '\t' -v l="$target" '$1==l {print $2; exit}' "$tsv")
+  savedargs=$(awk -F '\t' -v l="$target" '$1==l {print $3; exit}' "$tsv")
+  if [ -n "$saved" ]; then
+    target="$saved"
+    # shellcheck disable=SC2086  # deliberate word-splitting of saved args
+    [ -n "$savedargs" ] && set -- $savedargs "$@"
+  fi
+  # Per-app compatibility fixes (fixes/<id>.fix) matched on the exe name.
+  local ids; ids=$(fixes_for "$name" "$target")
+  if [ -n "$ids" ]; then
+    fix_apply "$name" "$target" $ids
+    local a extra=""
+    # shellcheck disable=SC2086
+    for a in $FIX_ARGS; do case " $* " in *" $a "*) ;; *) extra="$extra $a";; esac; done
+    # shellcheck disable=SC2086
+    [ -n "$extra" ] && set -- $extra "$@"
+  fi
+  if [ "$admin" = 1 ]; then
+    run_admin "$name" "$target" "$@"
+    return
+  fi
+  if [ -f "$target" ]; then
+    local extra line; extra=$(installer_log_args "$name" "$target" "$@")
+    while IFS= read -r line; do [ -n "$line" ] && set -- "$@" "$line"; done <<EOF
+$extra
+EOF
+    cd "$(dirname "$target")"   # many games expect CWD == exe dir
+    case "$target" in
+      *.msi|*.MSI) run_wine "$name" msiexec /i "$target" "$@";;
+      *.bat|*.BAT) run_wine "$name" cmd /c "$target" "$@";;
+      *)           run_wine "$name" "$target" "$@";;
+    esac
+  else
+    # A Windows path (C:\...\game.exe: store integrations, recipes, saved labels) gets the same
+    # CWD == exe dir as a unix path does.
+    local ux; ux=$(to_unix_path "$name" "$target")
+    [ "$ux" != "$target" ] && [ -f "$ux" ] && cd "$(dirname "$ux")"
+    run_wine "$name" "$target" "$@"
+  fi
+}
+
+# ---------------------------------------------------------------- installer logs
+#
+# Installers only write a step-by-step log when asked. Ask on every launch we can
+# recognise, into C:\decant-logs (no spaces: some installers mangle quoted paths),
+# and link the newest one as logs/installer-latest.log. docs/adr/0014.
+
+installer_kind() { # unix exe -> inno | msi | nsis | other
+  case "$1" in *.msi|*.MSI) echo msi; return;; esac
+  if LC_ALL=C grep -qa 'Inno Setup' "$1" 2>/dev/null; then echo inno
+  elif LC_ALL=C grep -qa 'Nullsoft' "$1" 2>/dev/null; then echo nsis
+  else echo other; fi
+}
+
+# Decide the log file for an installer launch; prints the extra args to pass.
+installer_log_args() { # bottle unix-exe args...
+  local b="$1" exe="$2"; shift 2
+  local kind a; kind=$(installer_kind "$exe")
+  case "$kind" in inno|msi) ;; *) return 0;; esac
+  for a in "$@"; do case "$(lower "$a")" in /log*|/l\**|/l) return 0;; esac; done   # user chose their own
+  local dir name; dir="$(bottle_dir "$b")/prefix/drive_c/decant-logs"; mkdir -p "$dir"
+  name="$(date +%Y%m%d-%H%M%S)-$(printf '%s' "$(basename "${exe%.*}")" | tr -c 'A-Za-z0-9_-' '_' | cut -c1-40).log"
+  ln -sf "$dir/$name" "$(bottle_dir "$b")/logs/installer-latest.log"
+  case "$kind" in
+    inno) printf '/LOG=C:\\decant-logs\\%s' "$name";;
+    msi)  printf '/l*v\nC:\\decant-logs\\%s' "$name";;
+  esac
+}
+
+# ---------------------------------------------------------------- run as administrator
+#
+# No sudo: Wine has no Windows ACLs for root to bypass, and root-owned files in a
+# bottle cause the very "access denied" errors we're fixing. Instead
+# (docs/adr/0013): stage the installer inside the bottle, clear read-only bits,
+# and launch through decant-elevate.exe, which asks Wine for the full admin token.
+
+unix_to_win() { # bottle unix-path -> Windows path (C:\ inside drive_c, Z:\ elsewhere)
+  local c; c="$(bottle_dir "$1")/prefix/drive_c/"
+  case "$2" in
+    "$c"*) printf 'C:\\%s' "$(printf '%s' "${2#$c}" | tr '/' '\\')";;
+    *)     printf 'Z:%s' "$(printf '%s' "$2" | tr '/' '\\')";;
+  esac
+}
+
+# Copy an installer that lives outside the bottle into C:\decant-stage\<name>.
+# Same disk: APFS clone (instant, no space). Prints the staged exe path.
+stage_installer() { # bottle exe
+  local b="$1" exe="$2" dir base stem dest
+  dir=$(cd "$(dirname "$exe")" && pwd -P); base=$(basename "$exe"); stem="${base%.*}"
+  case "$dir/" in "$(cd "$(bottle_dir "$b")" && pwd -P)/"*) printf '%s' "$exe"; return;; esac   # already inside
+  dest="$(bottle_dir "$b")/prefix/drive_c/decant-stage/$(basename "$dir")-$stem"
+  rm -rf "$dest"; mkdir -p "$dest"
+  local f shared="|" d
+  # Compare physical paths (pwd -P): ~/Downloads may be a symlink.
+  for d in "$HOME" "$HOME/Downloads" "$HOME/Desktop" "$HOME/Documents"; do
+    [ -d "$d" ] && shared="$shared$(cd "$d" && pwd -P)|"
+  done
+  case "$shared" in
+    *"|$dir|"*)
+      # Shared folder: only the installer and its parts (setup.exe, setup-1.bin, ...).
+      for f in "$dir/$stem"*; do cp -cR "$f" "$dest/" 2>/dev/null || cp -R "$f" "$dest/"; done;;
+    *)  # The installer's own folder, or a mounted disk image: it may need every file.
+      cp -cR "$dir/." "$dest/" 2>/dev/null || cp -R "$dir/." "$dest/";;
+  esac
+  chmod -R u+rwX "$dest" 2>/dev/null || true
+  xattr -dr com.apple.quarantine "$dest" 2>/dev/null || true
+  info "staged $(basename "$dir")/$stem* into C:\\decant-stage (copy is APFS-cloned when on the same disk)"
+  printf '%s' "$dest/$base"
+}
+
+# Non-root repairs: read-only bits and quarantine flags inside drive_c.
+repair_user_level() { # bottle -> prints what it fixed
+  local c n; c="$(bottle_dir "$1")/prefix/drive_c"
+  n=$(find "$c" ! -perm -u+w 2>/dev/null | awk 'END { print NR }')
+  if [ "$n" -gt 0 ]; then chmod -R u+w "$c" 2>/dev/null || true; info "made $n read-only item(s) writable"; fi
+  return 0
+}
+
+foreign_owned() { # bottle -> first path not owned by the current user
+  find "$(bottle_dir "$1")" ! -user "$(id -u)" -print 2>/dev/null | first_line
+}
+
+run_admin() { # bottle target args...
+  local b="$1" target="$2"; shift 2
+  [ -f "$ELEVATE" ] || die "decant-elevate64.exe missing in $SHARE (reinstall Decant)"
+  local f; f=$(foreign_owned "$b")
+  [ -z "$f" ] || die "files in bottle $b are owned by another user (e.g. $f), usually from running Wine with sudo. Fix with: decant repair $b"
+  repair_user_level "$b"
+  local exe="$target"
+  if [ -f "$target" ]; then exe=$(stage_installer "$b" "$target"); fi
+  local win="$exe" extra="" line
+  case "$exe" in /*) win=$(unix_to_win "$b" "$exe"); extra=$(installer_log_args "$b" "$exe" "$@");; esac
+  case "$exe" in /*) cd "$(dirname "$exe")";; esac
+  while IFS= read -r line; do [ -n "$line" ] && set -- "$@" "$line"; done <<EOF
+$extra
+EOF
+  case "$exe" in
+    *.msi|*.MSI) run_wine "$b" "$ELEVATE" 'C:\windows\system32\msiexec.exe' /i "$win" "$@";;
+    *)           run_wine "$b" "$ELEVATE" "$win" "$@";;
+  esac
+}
+
+cmd_repair() { # bottle [--print-sudo]
+  local b="${1:-}"; need_bottle "$b"
+  local f; f=$(foreign_owned "$b")
+  if [ -n "$f" ]; then
+    local cmd="chown -R $(id -un) \"$(bottle_dir "$b")\""
+    if [ "${2:-}" = --print-sudo ]; then echo "$cmd"; return 0; fi
+    printf 'decant: some files in bottle %s are owned by another user, e.g.\n  %s\nThis needs an administrator password once:\n  sudo %s\n' "$b" "$f" "$cmd" >&2
+    return 3
+  fi
+  [ "${2:-}" = --print-sudo ] && return 0
+  repair_user_level "$b"
+  xattr -dr com.apple.quarantine "$(bottle_dir "$b")/prefix/drive_c" 2>/dev/null || true
+  info "bottle $b permissions OK"
+}
+
+# ---------------------------------------------------------------- status / diagnostics
+#
+# "Is it stuck?" Windows processes are mapped to bottles by the files they have
+# open inside the bottle's prefix (Wine overwrites their argv/env, so ps can't).
+
+# Wine's own background processes: never the thing the user is waiting on.
+SYSTEM_PROCS="|services.exe|winedevice.exe|plugplay.exe|svchost.exe|rpcss.exe|explorer.exe|conhost.exe|winemenubuilder.exe|tabtip.exe|start.exe|wineboot.exe|decant-elevate64.exe|steamservice.exe|"
+
+bottle_procs() { # bottle -> TSV: pid cpu elapsed name system(0|1)
+  local prefix phys pid cpu et cmd name sys
+  # lsof reports resolved paths, so match the physical prefix path too.
+  prefix="n$(bottle_dir "$1")/prefix/"; phys="n$(cd "$(bottle_dir "$1")" && pwd -P)/prefix/"
+  ps -axo pid=,%cpu=,etime=,command= | while read -r pid cpu et cmd; do
+    case "$cmd" in *.exe*|*.EXE*|*.tmp*|*.TMP*) ;; *) continue;; esac
+    lsof -p "$pid" -Fn 2>/dev/null | awk -v p="$prefix" -v q="$phys" 'index($0, p) == 1 || index($0, q) == 1 { f = 1 } END { exit !f }' || continue
+    name=$(printf '%s' "$cmd" | sed -E 's/\.([eE][xX][eE]|[tT][mM][pP])( .*)?$/.\1/; s/.*[\\/]//')
+    case "$SYSTEM_PROCS" in *"|$(lower "$name")|"*) sys=1;; *) sys=0;; esac
+    printf '%s\t%s\t%s\t%s\t%s\n' "$pid" "$cpu" "$et" "$name" "$sys"
+  done
+}
+
+age_of() { # file -> seconds since last write, or empty
+  [ -e "$1" ] || return 0
+  echo $(( $(date +%s) - $(stat -L -f %m "$1" 2>/dev/null || date +%s) ))
+}
+
+cmd_status() { # bottle [--tsv]
+  local b="${1:-}" tsv=0; need_bottle "$b"; [ "${2:-}" = --tsv ] && tsv=1
+  local procs busy=0 user=0 pid cpu et name sys log ilog la ila state msg
+  procs=$(bottle_procs "$b")
+  log="$(bottle_dir "$b")/logs/latest.log"; ilog="$(bottle_dir "$b")/logs/installer-latest.log"
+  la=$(age_of "$log"); ila=$(age_of "$ilog")
+  while IFS='	' read -r pid cpu et name sys; do
+    [ -n "$pid" ] || continue
+    [ "$sys" = 1 ] && continue
+    user=$((user + 1))
+    # %cpu is a float; anything >= 5 means real work.
+    case "$cpu" in [5-9].*|[1-9][0-9]*) busy=1;; esac
+  done <<EOF
+$procs
+EOF
+  if [ "$user" = 0 ]; then state=stopped; msg="nothing running in $b"
+  elif [ "$busy" = 1 ]; then state=busy; msg="working (using CPU)"
+  elif [ -n "$ila" ] && [ "$ila" -lt 15 ]; then state=busy; msg="working (installer log updated ${ila}s ago)"
+  else state=waiting; msg="idle: probably waiting for you (look for a dialog, possibly behind another window)"; fi
+
+  if [ $tsv = 1 ]; then
+    printf '%s\n' "$procs" | awk -F '\t' 'NF { print "proc\t" $0 }'
+    printf 'log\t%s\t%s\n' "$log" "$la"
+    [ -e "$ilog" ] && printf 'installer-log\t%s\t%s\n' "$(readlink "$ilog")" "$ila"
+    printf 'state\t%s\t%s\n' "$state" "$msg"
+    return 0
+  fi
+  printf 'Bottle %s: %s\n\n' "$b" "$msg"
+  if [ -n "$procs" ]; then
+    printf '  %-7s %6s %10s  %s\n' PID CPU% ELAPSED PROGRAM
+    while IFS='	' read -r pid cpu et name sys; do
+      [ -n "$pid" ] || continue
+      printf '  %-7s %6s %10s  %s%s\n' "$pid" "$cpu" "$et" "$name" "$([ "$sys" = 1 ] && echo '  (wine)')"
+    done <<EOF
+$procs
+EOF
+    echo
+  fi
+  [ -n "$la" ] && printf '  Launch log     updated %ss ago   decant logs %s\n' "$la" "$b"
+  [ -e "$ilog" ] && printf '  Installer log  updated %ss ago   decant logs %s --installer\n' "$ila" "$b"
+  return 0
+}
+
+cmd_logs() { # bottle [--installer] [--follow] [lines]
+  local b="${1:-}"; need_bottle "$b"; shift
+  local f="$(bottle_dir "$b")/logs/latest.log" follow=0 n=200 a
+  for a in "$@"; do
+    case "$a" in --installer) f="$(bottle_dir "$b")/logs/installer-latest.log";; --follow|-f) follow=1;; [0-9]*) n="$a";; esac
+  done
+  [ -e "$f" ] || die "no such log yet: $f"
+  if [ $follow = 1 ]; then exec tail -n "$n" -F "$f"; else tail -n "$n" "$f"; fi
+}
+
+# Newest N existing files among the given paths/globs. Never fails on "no match"
+# (an unmatched glob into `ls -t | …` would abort the CLI under pipefail).
+newest() { # n path...
+  local n="$1" f; shift
+  # `if`, not `[ ] &&`: a false test as the loop's last command would fail the pipeline.
+  for f in "$@"; do if [ -f "$f" ]; then printf '%s\t%s\n' "$(stat -f %m "$f")" "$f"; fi; done | sort -rn | awk -F '\t' -v n="$n" 'NR <= n { print $2 }'
+}
+
+# Bundle everything useful for asking for help into one zip.
+cmd_diagnostics() { # bottle [--out file.zip]
+  local b="${1:-}"; need_bottle "$b"
+  local out="$HOME/Desktop/decant-$b-$(date +%Y%m%d-%H%M%S).zip"
+  [ "${2:-}" = --out ] && [ -n "${3:-}" ] && out="$3"
+  local tmp; tmp=$(mktemp -d "${TMPDIR:-/tmp}/decant-diag.XXXXXX"); local d="$tmp/decant-$b"
+  mkdir -p "$d/logs" "$d/installer-logs"
+  cp "$(bottle_conf "$b")" "$d/bottle.conf"
+  cp "$(bottle_dir "$b")/programs.tsv" "$d/" 2>/dev/null || true
+  newest 5 "$(bottle_dir "$b")"/logs/2*.log | while IFS= read -r f; do cp "$f" "$d/logs/"; done
+  newest 3 "$(bottle_dir "$b")"/prefix/drive_c/decant-logs/*.log | while IFS= read -r f; do cp "$f" "$d/installer-logs/"; done
+  {
+    echo "decant $DECANT_VERSION  $(sw_vers -productName) $(sw_vers -productVersion) ($(sw_vers -buildVersion))  $(uname -m)"
+    echo "cpu: $(sysctl -n machdep.cpu.brand_string 2>/dev/null)"; echo
+    cmd_status "$b"; echo
+    echo "== runtimes"; runtime_list; echo
+    echo "== backends"; cmd_backend list; echo
+    echo "== fixes"; cmd_fix status "$b"
+  } > "$d/summary.txt" 2>&1
+  (cd "$tmp" && /usr/bin/zip -qr "$out" "decant-$b")
+  rm -rf "$tmp"
+  info "wrote $out (logs contain file paths, including your user name)"
+  echo "$out"
+}
+
+# ---------------------------------------------------------------- controllers
+#
+# Wine's winebus turns controllers into XInput/DirectInput devices through SDL2
+# (Xbox, PlayStation, Switch Pro, most pads) or macOS IOHID. This lists what
+# macOS sees and opens Wine's Game Controllers panel (joy.cpl) to test it live.
+
+mac_controllers() { # -> one line per HID joystick/gamepad macOS sees
+  # hidutil columns: VendorID ProductID LocationID UsagePage Usage RegistryID Transport Class Product UserClass
+  # (Product may contain spaces; UserClass is the last field.) DECANT_HIDUTIL lets tests fake it.
+  "${DECANT_HIDUTIL:-hidutil}" list 2>/dev/null | awk '$4 == "0x1" && ($5 == "0x4" || $5 == "0x5" || $5 == "0x8") {
+    name = ""; for (i = 9; i < NF; i++) name = name (i > 9 ? " " : "") $i
+    print "  " (name == "" ? "(unnamed)" : name) "  [" $7 ", vendor " $1 " product " $2 "]" }' | sort -u
+}
+
+cmd_controllers() { # bottle
+  local b="${1:-}"; need_bottle "$b"
+  local list; list=$(mac_controllers)
+  if [ -n "$list" ]; then printf 'Controllers macOS sees:\n%s\n' "$list"
+  else echo "macOS sees no game controllers. Connect one (USB, or pair it in System Settings > Bluetooth) and try again."; fi
+  echo "Opening Wine's Game Controllers panel in $b: press buttons to test. Steam Input (in Steam's game"
+  echo "properties) can take over controllers for Steam games; turn it off there if a pad isn't seen."
+  run_wine "$b" control joy.cpl
+}
+
+cmd_program() {
+  local sub="${1:-list}" name="${2:-}"
+  need_bottle "$name"
+  local f; f="$(bottle_dir "$name")/programs.tsv"
+  case "$sub" in
+    list) cat "$f";;
+    add)
+      local label="${3:-}" path="${4:-}"; shift 4 2>/dev/null || shift $#
+      [ -n "$label" ] && [ -n "$path" ] || die "usage: decant program add <bottle> <label> <path> [default args...]"
+      { grep -v "^$label	" "$f" || true; printf '%s\t%s\t%s\n' "$label" "$path" "$*"; } > "$f.tmp"; mv "$f.tmp" "$f";;
+    remove)
+      { grep -v "^${3:-}	" "$f" || true; } > "$f.tmp"; mv "$f.tmp" "$f";;
+    scan) shift 2; program_scan "$name" "$@";;
+    *) die "usage: decant program list|add|remove|scan <bottle> ...";;
+  esac
+}
+
+# ---------------------------------------------------------------- game discovery
+#
+# Find games a user installed by hand. Precision over recall: one best guess per
+# install folder, skipping Wine's own stand-in programs, store-owned folders
+# (their integration lists those games), console tools and helper executables.
+
+# Folders under the scan roots that never contain user-installed games.
+SCAN_SKIP_DIRS="Common Files|Internet Explorer|Windows Media Player|Windows NT|Windows Mail|Windows Photo Viewer|Windows Sidebar|Microsoft.NET|Microsoft|WindowsPowerShell|Reference Assemblies|Uninstall Information|InstallShield Installation Information|dotnet"
+# Bundled-prerequisite subfolders (_Redist, _CommonRedist, __Installer, DirectX, Prerequisites)
+# hold tools shipped next to a game, never the game; scan_folder prunes them.
+# Executable names that are tools around a game, not the game (lowercase globs).
+SCAN_SKIP_EXES="unins*|*uninstall*|*setup*|*install*|*crash*|*report*|*helper*|*update*|*patch*|vc_redist*|vcredist*|dxsetup*|dxwebsetup*|dotnet*|ndp*|oalinst*|physx*|ue4prereq*|*prereq*|*redist*|unitycrashhandler*|cefsharp*|qtwebengineprocess*|*browsersubprocess*|*webhelper*|*service*|*server*|*benchmark*|7z*|*-cli.exe|*_cli.exe|config*.exe|*settings*.exe|*editor*.exe|*bugreport*|*telemetry*"
+
+pe_subsystem() { # exe -> 2 (GUI) / 3 (console) / empty
+  local off
+  off=$(od -An -tu4 -j60 -N4 "$1" 2>/dev/null | tr -d ' ')
+  [ -n "$off" ] || return 0
+  od -An -tu2 -j$((off + 24 + 68)) -N2 "$1" 2>/dev/null | tr -d ' '
+}
+
+file_size() { stat -f %z "$1" 2>/dev/null || echo 0; }
+
+# Normalise for fuzzy name comparison: lowercase, letters and digits only, and a roman
+# numeral after the first word becomes digits, so the folder "Hades II" matches Hades2.exe.
+name_key() {
+  lower "$1" | awk 'BEGIN { split("ii iii iv v vi vii viii ix x", r, " "); for (i in r) n[r[i]] = i + 1 }
+    { k = split($0, w, /[^a-z0-9]+/); o = ""; for (i = 1; i <= k; i++) { t = w[i]; if (o != "" && (t in n)) t = n[t]; o = o t }; printf "%s", o }'
+}
+
+program_scan() { # bottle [--all] [--since <epoch>]
+  local name="$1"; shift
+  local all=0 since="" a
+  while [ $# -gt 0 ]; do
+    case "$1" in --all) all=1; shift;; --since) since="$2"; shift 2;; *) die "usage: decant program scan <bottle> [--all] [--since <epoch>]";; esac
+  done
+  local c="$(bottle_dir "$name")/prefix/drive_c" marker="" roots="" r
+  if [ -n "$since" ]; then
+    marker="$(bottle_dir "$name")/.scan-since"
+    touch -t "$(date -r "$since" +%Y%m%d%H%M.%S)" "$marker"
+  fi
+  # Store launchers own their folder; their integration reports those games.
+  local owned="" i l
+  for i in $(integration_ids); do
+    l=$(integ "$i" detect "$name" 2>/dev/null) || continue
+    owned="$owned|$(dirname "$(to_unix_path "$name" "$l")" | sed 's|/dosdevices/c:/|/drive_c/|')"
+  done
+  # Already in the library (any path form) -> skip.
+  local known; known=$(cut -f2 "$(bottle_dir "$name")/programs.tsv" 2>/dev/null | while IFS= read -r a; do
+    [ -n "$a" ] && lower "$(to_unix_path "$name" "$a" | sed 's|/dosdevices/c:/|/drive_c/|')" && echo; done)
+
+  for r in "$c/Program Files" "$c/Program Files (x86)" "$c/Games" "$c/GOG Games" "$c"/users/*/AppData/Local/Programs; do
+    [ -d "$r" ] || continue
+    for dir in "$r"/*/; do
+      dir=${dir%/}
+      [ -d "$dir" ] || continue
+      case "|$SCAN_SKIP_DIRS|" in *"|$(basename "$dir")|"*) continue;; esac
+      case "$owned|" in *"|$dir|"*) continue;; esac
+      if [ -n "$marker" ] && [ -z "$(find "$dir" -newer "$marker" -print 2>/dev/null | first_line)" ]; then continue; fi
+      # A folder that already has a library entry is that game's: don't offer its helpers.
+      case "$known" in *"$(lower "$dir")/"*) continue;; esac
+      scan_folder "$dir" "$all" "$known"
+    done
+  done
+  [ -n "$marker" ] && rm -f "$marker"
+  return 0
+}
+
+# Print the best game exe in one install folder (or every candidate with --all).
+scan_folder() { # dir all known
+  local dir="$1" all="$2" known="$3" exe base sub score best="" bestscore=-1 key stemkey
+  key=$(name_key "$(basename "$dir")")
+  while IFS= read -r exe; do
+    [ -n "$exe" ] || continue
+    base=$(lower "$(basename "$exe")")
+    if printf '%s\n' "$SCAN_SKIP_EXES" | tr '|' '\n' | awk -v b="$base" '{ g = $0; gsub(/\./, "\\.", g); gsub(/\*/, ".*", g); if (b ~ "^" g "$") m = 1 } END { exit !m }'; then continue; fi
+    case "$base" in *.decant-real.exe) continue;; esac
+    case "$known" in *"$(lower "$exe")"*) continue;; esac
+    sub=$(pe_subsystem "$exe")
+    [ "$sub" = 2 ] || continue                                  # GUI programs only
+    # Score: name matches the folder name > shallow path > big file.
+    score=$(( $(file_size "$exe") / 1048576 ))
+    stemkey=$(name_key "${base%.exe}")
+    case "$stemkey" in "$key"|"$key"*|*"$key") score=$((score + 10000));; esac
+    case "$key" in "$stemkey"*) score=$((score + 5000));; esac
+    [ "$(dirname "$exe")" = "$dir" ] && score=$((score + 2000))
+    if [ "$all" = 1 ]; then printf '%s\n' "$exe"
+    elif [ "$score" -gt "$bestscore" ]; then best="$exe"; bestscore=$score; fi
+  done <<EOF
+$(find "$dir" -maxdepth 3 -type d \( -iname '*redist*' -o -iname '*prereq*' -o -iname '_installer' -o -iname '__installer' -o -iname 'directx' \) -prune \
+    -o -iname '*.exe' -type f -print 2>/dev/null)
+EOF
+  [ -n "$best" ] && printf '%s\n' "$best"
+  return 0
+}
+
+kill_bottle() {
+  local name="$1"; need_bottle "$name"
+  RT_DIR=""; bottle_env "$name"
+  "$RT_DIR/bin/wineserver" -k 2>/dev/null || true
+  info "stopped all processes in $name"
+}
+
+# ---------------------------------------------------------------- compatibility fixes
+#
+# App-specific knowledge lives in recipes (fixes/<id>.fix), never in this script.
+# Format: docs/fixes/README.md. Why: docs/adr/0005, docs/adr/0006.
+
+FIX_KEYS="TITLE MATCH ARGS ENV DLLOVERRIDES REG SHIM INSTALL_URL INSTALL_ARGS PROGRAM NOTES SOURCE VERIFIED"
+
+fix_file() { # id -> winning recipe path (user dir overrides built-in)
+  local d
+  for d in "$DECANT_HOME/fixes" "$BUILTIN_FIXES"; do
+    [ -f "$d/$1.fix" ] && { echo "$d/$1.fix"; return 0; }
+  done
+  return 1
+}
+
+fix_ids() {
+  local d f
+  for d in "$DECANT_HOME/fixes" "$BUILTIN_FIXES"; do
+    for f in "$d"/*.fix; do [ -f "$f" ] && basename "$f" .fix; done
+  done | sort -u
+}
+
+fix_disabled() { # bottle id
+  [ "${DECANT_NO_FIXES:-}" = 1 ] && return 0
+  case " $(conf_get "$(bottle_conf "$1")" FIXES_DISABLED) " in *" all "*|*" $2 "*) return 0;; esac
+  return 1
+}
+
+fixes_for() { # bottle exe -> enabled ids whose MATCH lists the exe's basename
+  local base id f m
+  base=$(lower "$(basename "$(printf '%s' "$2" | tr '\\' '/')")")
+  for id in $(fix_ids); do
+    f=$(fix_file "$id") || continue
+    for m in $(lower "$(conf_get "$f" MATCH)"); do
+      if [ "$m" = "$base" ]; then fix_disabled "$1" "$id" || echo "$id"; break; fi
+    done
+  done
+}
+
+# C:\foo\bar.exe -> <prefix>/dosdevices/c:/foo/bar.exe ; unix paths pass through.
+to_unix_path() { # bottle path
+  case "$2" in
+    [A-Za-z]:\\*|[A-Za-z]:/*)
+      printf '%s/prefix/dosdevices/%s:%s' "$(bottle_dir "$1")" "$(lower "${2%%:*}")" "$(printf '%s' "${2#?:}" | tr '\\' '/')";;
+    *) printf '%s' "$2";;
+  esac
+}
+
+pe_is_64() { # exe -> success if PE32+ x86-64
+  local off m
+  off=$(od -An -tu4 -j60 -N4 "$1" 2>/dev/null | tr -d ' ')
+  [ -n "$off" ] || return 1
+  m=$(od -An -tx2 -j$((off + 4)) -N2 "$1" 2>/dev/null | tr -d ' ')
+  [ "$m" = 8664 ]
+}
+
+is_shim() { cmp -s "$1" "$SHIM64" || cmp -s "$1" "$SHIM32"; }
+
+# Put decant-shim in front of one executable and (re)write its sidecar.
+# Idempotent; if the app updated the file (no longer our shim) the new file
+# becomes the real binary. See shim/decant-shim.c for the sidecar format.
+shim_install() { # fix-id target-exe inject skip-tokens
+  local id="$1" t="$2" inject="$3" skip="$4" stem real s
+  stem="${t%.*}"; real="$stem.decant-real.exe"
+  [ -f "$SHIM64" ] && [ -f "$SHIM32" ] || die "shims missing in $SHARE (reinstall Decant)"
+  if ! is_shim "$t"; then
+    mv -f "$t" "$real"
+    if pe_is_64 "$real"; then cp "$SHIM64" "$t"; else cp "$SHIM32" "$t"; fi
+    info "fix $id: shimmed $(basename "$t")"
+  fi
+  [ -f "$real" ] || { warn "fix $id: $t is a shim but $real is missing"; return 0; }
+  {
+    echo "# written by decant for fix '$id' — regenerated on every launch, do not edit"
+    echo "fix=$id"
+    [ -n "$inject" ] && echo "inject=$inject"
+    for s in $skip; do echo "skip=$s"; done
+  } > "$stem.decant-shim"
+}
+
+shim_revert_all() { # bottle id -> restore every binary this fix shimmed
+  local sc stem n=0
+  while IFS= read -r sc; do
+    [ -n "$sc" ] || continue
+    grep -qx "fix=$2" "$sc" || continue
+    stem="${sc%.decant-shim}"
+    [ -f "$stem.decant-real.exe" ] && mv -f "$stem.decant-real.exe" "$stem.exe"
+    rm -f "$sc"; n=$((n + 1))
+  done <<EOF
+$(find "$(bottle_dir "$1")/prefix/drive_c" -name '*.decant-shim' 2>/dev/null)
+EOF
+  info "fix $2: reverted $n shim(s)"
+}
+
+# Apply recipes for one launch: shims + registry now, args/env/dll via FIX_*.
+fix_apply() { # bottle exe id...
+  local name="$1" exe="$2"; shift 2
+  local exedir id f line glob inject skip t stamp hash
+  exedir=$(dirname "$(to_unix_path "$name" "$exe")")
+  mkdir -p "$(bottle_dir "$name")/.fixes"
+  for id in "$@"; do
+    f=$(fix_file "$id") || continue
+    info "fix $id: $(conf_get "$f" TITLE "$id")"
+    FIX_ARGS="$FIX_ARGS $(conf_get "$f" ARGS)"
+    FIX_ENV="$FIX_ENV
+$(conf_all "$f" ENV)"
+    line=$(conf_get "$f" DLLOVERRIDES)
+    [ -n "$line" ] && FIX_DLL="${FIX_DLL:+$FIX_DLL;}$line"
+
+    # SHIM=<glob relative to exe dir>|<inject args>|<skip substrings>
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      glob=${line%%|*}; line=${line#*|}; inject=${line%%|*}; skip=${line#*|}
+      # Expand the glob in a subshell with IFS=newline so paths with spaces survive.
+      while IFS= read -r t; do
+        case "$t" in *.decant-real.exe) continue;; esac
+        [ -f "$t" ] && shim_install "$id" "$t" "$inject" "$skip"
+      done <<GLOB
+$(IFS='
+'; for t in "$exedir"/$glob; do printf '%s\n' "$t"; done)
+GLOB
+    done <<EOF
+$(conf_all "$f" SHIM)
+EOF
+
+    # REG=<key>|<value>|<type>|<data> — applied once per recipe version.
+    stamp="$(bottle_dir "$name")/.fixes/$id.reg"
+    hash=$(conf_all "$f" REG | md5 -q)
+    if [ -n "$(conf_all "$f" REG)" ] && [ "$(cat "$stamp" 2>/dev/null)" != "$hash" ]; then
+      while IFS='|' read -r k v ty d; do
+        [ -n "$k" ] || continue
+        run_wine "$name" --wait reg add "$k" /v "$v" /t "${ty:-REG_SZ}" /d "$d" /f >/dev/null
+      done <<EOF
+$(conf_all "$f" REG)
+EOF
+      echo "$hash" > "$stamp"
+    fi
+  done
+}
+
+fix_check() { # [file...] -> lint recipes; non-zero on problems
+  local f key bad=0 line n
+  [ $# -gt 0 ] || set -- "$BUILTIN_FIXES"/*.fix "$DECANT_HOME"/fixes/*.fix
+  for f in "$@"; do
+    [ -f "$f" ] || continue
+    n=0
+    while IFS= read -r line; do
+      n=$((n + 1))
+      case "$line" in ''|'#'*) continue;; esac
+      key=${line%%=*}
+      case " $FIX_KEYS " in *" $key "*) ;; *) echo "$f:$n: unknown key '$key'"; bad=1;; esac
+      case "$key" in
+        SHIM) [ "$(printf '%s' "$line" | tr -cd '|' | wc -c | tr -d ' ')" = 2 ] || { echo "$f:$n: SHIM needs glob|inject|skip"; bad=1; };;
+        REG)  [ "$(printf '%s' "$line" | tr -cd '|' | wc -c | tr -d ' ')" = 3 ] || { echo "$f:$n: REG needs key|value|type|data"; bad=1; };;
+        ENV)  case "${line#ENV=}" in *=*) ;; *) echo "$f:$n: ENV needs KEY=VALUE"; bad=1;; esac;;
+        PROGRAM) [ "$(printf '%s' "$line" | tr -cd '|' | wc -c | tr -d ' ')" = 1 ] || { echo "$f:$n: PROGRAM needs label|path"; bad=1; };;
+      esac
+    done < "$f"
+    [ -n "$(conf_get "$f" MATCH)" ] || { echo "$f: missing MATCH"; bad=1; }
+    [ -n "$(conf_get "$f" TITLE)" ] || { echo "$f: missing TITLE"; bad=1; }
+    case "$(basename "$f" .fix)" in *[!a-z0-9-]*) echo "$f: id must be lowercase a-z0-9-"; bad=1;; esac
+  done
+  [ $bad = 0 ] && echo "fix recipes OK"
+  return $bad
+}
+
+cmd_fix() {
+  local sub="${1:-list}"; shift || true
+  case "$sub" in
+    list)
+      local id f
+      for id in $(fix_ids); do
+        f=$(fix_file "$id")
+        case "$f" in "$DECANT_HOME"/*) src=user;; *) src=builtin;; esac
+        printf '%s\t%s\t%s\t%s\n' "$id" "$src" "$(conf_get "$f" MATCH)" "$(conf_get "$f" TITLE)"
+      done;;
+    show)   f=$(fix_file "${1:-}") || die "no fix '${1:-}'"; echo "# $f"; cat "$f";;
+    check)  fix_check "$@";;
+    status) # bottle -> id, state, title for every recipe
+      need_bottle "${1:-}"
+      local id
+      for id in $(fix_ids); do
+        if fix_disabled "$1" "$id"; then st=disabled; else st=enabled; fi
+        printf '%s\t%s\t%s\n' "$id" "$st" "$(conf_get "$(fix_file "$id")" TITLE)"
+      done;;
+    disable|enable)
+      local name="${1:-}" id="${2:-}"; need_bottle "$name"
+      fix_file "$id" >/dev/null || die "no fix '$id' (see: decant fix list)"
+      local c cur new="" x; c=$(bottle_conf "$name"); cur=$(conf_get "$c" FIXES_DISABLED)
+      for x in $cur; do [ "$x" = "$id" ] || new="$new $x"; done
+      [ "$sub" = disable ] && new="$new $id"
+      conf_set "$c" FIXES_DISABLED "$(echo $new)"
+      [ "$sub" = disable ] && shim_revert_all "$name" "$id"
+      info "fix $id ${sub}d for $name";;
+    revert) need_bottle "${1:-}"; shim_revert_all "$1" "${2:-}";;
+    *) die "usage: decant fix list|show <id>|check [file]|status <bottle>|enable|disable|revert <bottle> <id>";;
+  esac
+}
+
+# ---------------------------------------------------------------- library
+#
+# One list of games per bottle: the user's own programs (programs.tsv) plus
+# whatever store integrations (integrations/<id>, docs/integrations.md) report.
+# Keys are "<source>:<id>": manual:<label>, steam:<appid>, ...
+
+integration_ids() { local f; for f in "$INTEGRATIONS"/*; do [ -f "$f" ] && [ -x "$f" ] && basename "$f"; done; }
+integ() { "$INTEGRATIONS/$1" "$2" "$(bottle_dir "$3")/prefix"; }   # id command bottle
+
+PS_SNAPSHOT=""
+is_running() { # match -> success if any process command line contains it (case-insensitive)
+  [ -n "$1" ] || return 1
+  case "$PS_SNAPSHOT" in *"$(lower "$1")"*) return 0;; esac
+  return 1
+}
+
+# Rows: key name source folder image target args match   (one bottle)
+library_rows() {
+  local b="$1" i launchers="" l label path args base
+  for i in $(integration_ids); do
+    l=$(integ "$i" detect "$b" 2>/dev/null) || continue
+    launchers="$launchers|$(lower "$(basename "$(printf '%s' "$l" | tr '\\' '/')")")|"
+    integ "$i" games "$b" 2>/dev/null | while IFS='	' read -r id name folder image target args match; do
+      [ -n "$id" ] && printf '%s:%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$i" "$id" "$name" "$i" "$folder" "$image" "$target" "$args" "$match"
+    done
+  done
+  while IFS='	' read -r label path args; do
+    [ -n "$label" ] || continue
+    base=$(lower "$(basename "$(printf '%s' "$path" | tr '\\' '/')")")
+    case "$launchers" in *"|$base|"*) continue;; esac          # launchers (steam.exe) aren't games
+    printf 'manual:%s\t%s\tmanual\t%s\t\t%s\t%s\t%s\n' "$label" "$label" \
+      "$(dirname "$(to_unix_path "$b" "$path")")" "$path" "$args" "\\$(basename "$(printf '%s' "$path" | tr '\\' '/')")"
+  done < "$(bottle_dir "$b")/programs.tsv"
+}
+
+library_row() { # bottle key -> that row
+  # No early "exit" in awk: with pipefail, closing the pipe early kills the producer (SIGPIPE).
+  library_rows "$1" | awk -F '\t' -v k="$2" '$1 == k && !done { print; done = 1 }'
+}
+
+cmd_library() {
+  local sub="${1:-list}"
+  case "$sub" in
+    list|--bottle) [ "$sub" = list ] && shift || true
+      local only="" b c
+      [ "${1:-}" = --bottle ] && only="$2"
+      PS_SNAPSHOT=$(ps -axo command= 2>/dev/null | tr '[:upper:]' '[:lower:]')
+      # Output: bottle key name source folder image running
+      for c in "$BOTTLES"/*/bottle.conf; do
+        [ -f "$c" ] || continue
+        b=$(basename "$(dirname "$c")")
+        [ -n "$only" ] && [ "$only" != "$b" ] && continue
+        library_rows "$b" | while IFS='	' read -r key name src folder image target args match; do
+          if is_running "$match"; then r=1; else r=0; fi
+          printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$b" "$key" "$name" "$src" "$folder" "$image" "$r"
+        done
+      done;;
+    add) # bottle name exe [args...]
+      local b="${2:-}" name="${3:-}" exe="${4:-}"
+      [ -n "$b" ] && [ -n "$name" ] && [ -n "$exe" ] || die "usage: decant library add <bottle> <name> <path.exe> [args...]"
+      need_bottle "$b"
+      case "$exe" in [A-Za-z]:\\*) ;; *) [ -f "$exe" ] || die "no such file: $exe";; esac
+      case "$name" in *'	'*|*:*) die "name can't contain tabs or ':'";; esac
+      shift 4; cmd_program add "$b" "$name" "$exe" "$@"
+      info "added $name to $b";;
+    remove) # bottle key  (manual entries only; store games are managed by their store)
+      need_bottle "${2:-}"
+      case "${3:-}" in manual:*) cmd_program remove "$2" "${3#manual:}";; *) die "only manual:<name> entries can be removed here; uninstall store games in the store";; esac;;
+    *) die "usage: decant library [list] [--bottle B] | add <bottle> <name> <exe> [args] | remove <bottle> manual:<name>";;
+  esac
+}
+
+cmd_play() { # bottle key [extra args]
+  local b="${1:-}" key="${2:-}" row target args
+  [ -n "$b" ] && [ -n "$key" ] || die "usage: decant play <bottle> <key>   (keys: decant library)"
+  need_bottle "$b"; shift 2
+  row=$(library_row "$b" "$key"); [ -n "$row" ] || die "no game '$key' in $b (see: decant library --bottle $b)"
+  target=$(printf '%s' "$row" | cut -f6); args=$(printf '%s' "$row" | cut -f7)
+  # shellcheck disable=SC2086  # stored args are a word list
+  cmd_run "$b" "$target" $args "$@"
+}
+
+cmd_stop() { # bottle key
+  local b="${1:-}" key="${2:-}" match pids
+  need_bottle "$b"
+  match=$(library_row "$b" "$key" | cut -f8); [ -n "$match" ] || die "no game '$key' in $b"
+  pids=$(ps -axo pid=,command= | grep -iF -- "$match" | grep -v grep | awk '{print $1}')
+  [ -n "$pids" ] || { info "$key isn't running"; return 0; }
+  # shellcheck disable=SC2086
+  kill $pids 2>/dev/null || true
+  info "stopped $key"
+}
+
+cmd_integration() { # list [bottle] -> bottle id title launcher
+  local c b i l
+  for c in "$BOTTLES"/*/bottle.conf; do
+    [ -f "$c" ] || continue
+    b=$(basename "$(dirname "$c")")
+    [ -n "${2:-}" ] && [ "$2" != "$b" ] && continue
+    for i in $(integration_ids); do
+      l=$(integ "$i" detect "$b" 2>/dev/null) || continue
+      printf '%s\t%s\t%s\t%s\n' "$b" "$i" "$("$INTEGRATIONS/$i" title)" "$l"
+    done
+  done
+}
+
+# Install an app described by a recipe's INSTALL_URL/INSTALL_ARGS/PROGRAM keys.
+cmd_install() { # bottle recipe-id
+  local name="${1:-}" id="${2:-}" f url file label path
+  [ -n "$name" ] && [ -n "$id" ] || die "usage: decant install <bottle> <recipe-id>  (recipes with INSTALL_URL: decant fix list)"
+  need_bottle "$name"
+  f=$(fix_file "$id") || die "no recipe '$id' (see: decant fix list)"
+  url=$(conf_get "$f" INSTALL_URL); [ -n "$url" ] || die "recipe '$id' has no INSTALL_URL"
+  ensure_dirs
+  file="$DOWNLOADS/$(basename "${url%%\?*}")"
+  download "$url" "$file"
+  # shellcheck disable=SC2046  # INSTALL_ARGS is a deliberate word list
+  run_wine "$name" --wait "$file" $(conf_get "$f" INSTALL_ARGS)
+  # PROGRAM=<label>|<windows path>: register the installed app as a launch target.
+  label=$(conf_get "$f" PROGRAM); path=${label#*|}; label=${label%%|*}
+  [ -n "$label" ] && cmd_program add "$name" "$label" "$path"
+  info "$(conf_get "$f" TITLE "$id") installed${label:+. Launch: decant run $name $label}"
+}
+
+usage() {
+  cat <<EOF
+decant $DECANT_VERSION — run Windows games on macOS via Wine + Metal
+
+  decant doctor                               check Rosetta, runtimes, backends
+  decant setup [--build-wine] [--gptk <dir>]  recommended setup: Wine, DXMT, DXVK, D3DMetal and a
+                                              default bottle "games"; skips what's already done
+  decant runtime install [staging|devel] [v]  download a prebuilt Wine (Gcenx builds)
+  decant runtime import <dir|Wine.app> <name> use a Wine you built (see scripts/build-wine.sh)
+  decant runtime list|remove <name>
+  decant backend install dxmt                 DX10/11 -> Metal (open source)
+  decant backend install dxvk                 DX9-11 -> Vulkan -> MoltenVK
+  decant backend install d3dmetal <GPTK dir>  DX11/12 -> Metal (Apple GPTK, bring your own)
+  decant backend list|remove <name>
+  decant bottle create <name> [--backend auto|dxmt|dxvk|d3dmetal|wined3d] [--runtime R]
+                                              auto (default): D3DMetal/DXMT for DX10-12, wined3d for
+                                              DX9 and older, MoltenVK for Vulkan; DXVK on non-Metal Wine
+  decant bottle list|show|delete|path <name>
+  decant bottle default [name]                show / set the bottle new games and installers go to
+  decant bottle set <name> KEY=VALUE...       BACKEND RUNTIME WINVER RETINA MSYNC AVX
+                                              METAL_HUD METALFX WINEDEBUG EXTRA_ENV
+  decant run <bottle> <exe|label|cmd> [args]  launch (logs in bottle/logs/latest.log)
+  decant run --admin <bottle> <exe> [args]    run as administrator: stage into the bottle, fix
+                                              permissions, launch with Wine's full admin token
+  decant repair <bottle>                      fix read-only files; detect files owned by another
+                                              user and print the one sudo command that fixes them
+  decant program add <bottle> <label> <path> [args] | list|remove <bottle>
+  decant program scan <bottle> [--all] [--since <epoch>]   find hand-installed games (best exe per folder)
+  decant library [--bottle B]                 all games: bottle key name source folder image running
+  decant library add <bottle> <name> <exe>    add a non-store game (.exe anywhere on disk)
+  decant library remove <bottle> manual:<name>
+  decant play <bottle> <key>                  launch a library entry (e.g. steam:2784470)
+  decant stop <bottle> <key>
+  decant integration list [bottle]            store launchers found in bottles (steam, ...)
+  decant install <bottle> <recipe-id>         download + run an app installer a recipe defines
+  decant install-steam <bottle>               alias for: decant install <bottle> steam
+  decant fix list|show <id>|check             per-app compatibility recipes (fixes/*.fix)
+  decant fix status <bottle>                  which recipes are enabled for a bottle
+  decant fix enable|disable|revert <bottle> <id>
+  decant winecfg|regedit|taskmgr <bottle>
+  decant kill <bottle>
+  decant controllers <bottle>                 list controllers macOS sees; open Wine's test panel
+  decant status <bottle>                      what's running, CPU, log activity: working or waiting?
+  decant logs <bottle> [--installer] [--follow] [N]
+  decant diagnostics <bottle> [--out f.zip]   zip of logs + settings + status, to attach anywhere
+EOF
+}
+
+main() {
+  local cmd="${1:-help}"; shift || true
+  case "$cmd" in
+    doctor)        cmd_doctor;;
+    setup)         cmd_setup "$@";;
+    runtime)       cmd_runtime "$@";;
+    backend)       cmd_backend "$@";;
+    bottle)        cmd_bottle "$@";;
+    run)           cmd_run "$@";;
+    program)       cmd_program "$@";;
+    install)       cmd_install "$@";;
+    library)       cmd_library "$@";;
+    play)          cmd_play "$@";;
+    stop)          cmd_stop "$@";;
+    integration)   cmd_integration "$@";;
+    install-steam) cmd_install "${1:-}" steam;;
+    fix)           cmd_fix "$@";;
+    winecfg|regedit|taskmgr) [ -n "${1:-}" ] || die "usage: decant $cmd <bottle>"; run_wine "$1" "$cmd";;
+    kill)          kill_bottle "${1:-}";;
+    repair)        cmd_repair "$@";;
+    logs)          cmd_logs "$@";;
+    status)        cmd_status "$@";;
+    controllers)   cmd_controllers "$@";;
+    diagnostics)   cmd_diagnostics "$@";;
+    version|--version) echo "$DECANT_VERSION";;
+    help|-h|--help) usage;;
+    *) usage; exit 1;;
+  esac
+}
+
+# DECANT_SOURCE_ONLY=1 lets tests source the functions without running a command.
+[ "${DECANT_SOURCE_ONLY:-}" = 1 ] || main "$@"

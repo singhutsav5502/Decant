@@ -1,0 +1,9 @@
+The patches in this directory modify Wine, as published in CodeWeavers'
+CrossOver source release. Wine is licensed under the GNU Lesser General Public
+License, version 2.1 or (at your option) any later version.
+
+These patches are derivative works of Wine and are distributed under the same
+licence: LGPL-2.1-or-later. The full text is at
+https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+
+The rest of Decant is MIT-licensed (see ../LICENSE).

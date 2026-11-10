@@ -1,0 +1,276 @@
+== 20261104-164423-84278  (0 KB)
+# decant run Wed Nov  4 16:44:23 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/repos/decant/bin/../share/decant-elevate64.exe C:\decant-stage\Hades II installer-setup\setup.exe /VERYSILENT /SUPPRESSMSGBOXES /DIR=C:\Program Files\Hades II /LOG=C:\decant-logs\20261104-164422-setup.log
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-test/prefix/drive_c/decant-logs/20261104-164422-setup.log
+# CX_REPORT_REAL_USERNAME=1
+# DXVK_ASYNC=1
+# DXVK_STATE_CACHE_PATH=~/Library/Application Support/Decant/bottles/fg-test/cache
+# MVK_CONFIG_FAST_MATH_ENABLED=1
+# MVK_CONFIG_LOG_LEVEL=1
+# MVK_CONFIG_RESUME_LOST_DEVICE=1
+# MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS=0
+# MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=d3d10core,d3d11=n,b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+
+== 20261104-164758-96075  (0 KB)
+# decant run Wed Nov  4 16:47:58 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/repos/decant/bin/../share/decant-elevate64.exe C:\decant-stage\Hades II installer-setup\setup.exe /LOG=C:\decant-logs\20261104-164758-setup.log
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-test/prefix/drive_c/decant-logs/20261104-164758-setup.log
+# CX_REPORT_REAL_USERNAME=1
+# DXVK_ASYNC=1
+# DXVK_STATE_CACHE_PATH=~/Library/Application Support/Decant/bottles/fg-test/cache
+# MVK_CONFIG_FAST_MATH_ENABLED=1
+# MVK_CONFIG_LOG_LEVEL=1
+# MVK_CONFIG_RESUME_LOST_DEVICE=1
+# MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS=0
+# MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=d3d10core,d3d11=n,b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+
+== 20261104-170742-10885  (48368 KB)
+# decant run Wed Nov  4 17:07:42 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/repos/decant/bin/../share/decant-elevate64.exe C:\decant-stage\Hades II installer-setup\setup.exe /LOG=C:\decant-logs\20261104-170742-setup.log
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-test/prefix/drive_c/decant-logs/20261104-170742-setup.log
+# CX_REPORT_REAL_USERNAME=1
+# DXVK_ASYNC=1
+# DXVK_STATE_CACHE_PATH=~/Library/Application Support/Decant/bottles/fg-test/cache
+# MVK_CONFIG_FAST_MATH_ENABLED=1
+# MVK_CONFIG_LOG_LEVEL=1
+# MVK_CONFIG_RESUME_LOST_DEVICE=1
+# MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS=0
+# MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+seh
+# WINEDLLOVERRIDES=d3d10core,d3d11=n,b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+0148:err:virtual:virtual_setup_exception stack overflow 2048 bytes addr 0x7bf8c0dd stack 0x170800 (0x170000-0x171000-0x270000)
+
+== 20261104-171122-23309  (48260 KB)
+# decant run Wed Nov  4 17:11:22 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/repos/decant/bin/../share/decant-elevate64.exe C:\decant-stage\Hades II installer-setup\setup.exe /LOG=C:\decant-logs\20261104-171121-setup.log
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-test/prefix/drive_c/decant-logs/20261104-171121-setup.log
+# CX_REPORT_REAL_USERNAME=1
+# DXVK_ASYNC=1
+# DXVK_STATE_CACHE_PATH=~/Library/Application Support/Decant/bottles/fg-test/cache
+# MVK_CONFIG_FAST_MATH_ENABLED=1
+# MVK_CONFIG_LOG_LEVEL=1
+# MVK_CONFIG_RESUME_LOST_DEVICE=1
+# MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS=0
+# MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS=1
+# WINEDEBUG=+seh
+# WINEDLLOVERRIDES=d3d10core,d3d11=n,b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+0148:err:virtual:virtual_setup_exception stack overflow 1664 bytes addr 0x7bf8c0dd stack 0x170980 (0x170000-0x171000-0x270000)
+
+== 20261104-171342-31224  (0 KB)
+# decant run Wed Nov  4 17:13:42 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/repos/decant/bin/../share/decant-elevate64.exe C:\decant-stage\Hades II installer-setup\setup.exe /LOG=C:\decant-logs\20261104-171342-setup.log
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-test/prefix/drive_c/decant-logs/20261104-171342-setup.log
+# CX_REPORT_REAL_USERNAME=1
+# DXVK_ASYNC=1
+# DXVK_STATE_CACHE_PATH=~/Library/Application Support/Decant/bottles/fg-test/cache
+# MVK_CONFIG_FAST_MATH_ENABLED=1
+# MVK_CONFIG_LOG_LEVEL=1
+# MVK_CONFIG_RESUME_LOST_DEVICE=1
+# MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS=0
+# MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=d3d10core,d3d11=n,b
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+
+== 20261104-172559-71514  (0 KB)
+# decant run Wed Nov  4 17:25:59 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/repos/decant/bin/../share/decant-elevate64.exe C:\decant-stage\Hades II installer-setup\setup.exe /LOG=C:\decant-logs\20261104-172559-setup.log
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-test/prefix/drive_c/decant-logs/20261104-172559-setup.log
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+
+== 20261104-173117-89855  (3 KB)
+# decant run Wed Nov  4 17:31:17 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/decant-investigation-logs/probe/memprobe32.exe C:\decant-logs\memprobe-memprobe32.txt
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-test/prefix/drive_c/decant-logs/memprobe-memprobe32.txt
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+memprobe 1
+commit 2048 MB: FAILED err=8
+commit 3072 MB: FAILED err=8
+HeapAlloc 2048 MB: FAILED
+
+== 20261104-173119-90132  (3 KB)
+# decant run Wed Nov  4 17:31:19 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/decant-investigation-logs/probe/memprobe32-nolaa.exe C:\decant-logs\memprobe-memprobe32-nolaa.txt
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-test/prefix/drive_c/decant-logs/memprobe-memprobe32-nolaa.txt
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+memprobe 1
+commit 2048 MB: FAILED err=487
+commit 3072 MB: FAILED err=487
+HeapAlloc 2048 MB: FAILED
+
+== 20261104-173120-90221  (3 KB)
+# decant run Wed Nov  4 17:31:20 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/decant-investigation-logs/probe/memprobe64.exe C:\decant-logs\memprobe-memprobe64.txt
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-test/prefix/drive_c/decant-logs/memprobe-memprobe64.txt
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+memprobe 1
+
+== 20261104-174945-48551  (48739 KB)
+# decant run Wed Nov  4 17:49:45 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/repos/decant/bin/../share/decant-elevate64.exe C:\decant-stage\Hades II installer-setup\setup.exe /LOG=C:\decant-logs\20261104-174945-setup.log
+# installer-log: ~/Library/Application Support/Decant/bottles/fg-test/prefix/drive_c/decant-logs/20261104-174945-setup.log
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# WINEDEBUG=+seh,+loaddll,+thread,+process
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-test/prefix
+0148:err:virtual:virtual_setup_exception stack overflow 1664 bytes addr 0x7bf8c0dd stack 0x170980 (0x170000-0x171000-0x270000)
+
+== 20261104-190231-54684  (628986 KB)
+# decant run Wed Nov  4 19:02:31 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: C:\repro\repro-gate.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+seh,+loaddll,+process
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-repro/prefix
+repro-gate: starting hammer loop
+repro-gate: done
+
+== 20261104-211216-84839  (22 KB)
+# decant run Wed Nov  4 21:12:16 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/decant-investigation-logs/probe/repro-gate2.exe 20
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-repro/prefix
+repro-gate2: 20s per phase
+syscall  done in  20.0s  sys=32475197 raise=0 av=0 cb=4 ctx=0 wnd=0
+raise    done in  20.0s  sys=32475197 raise=2010236 av=0 cb=4 ctx=0 wnd=0
+av       done in  20.0s  sys=32475197 raise=2010236 av=590054 cb=4 ctx=0 wnd=0
+callback done in  20.0s  sys=32475197 raise=2010236 av=590054 cb=315315 ctx=0 wnd=803
+setctx   done in  20.0s  sys=32519673 raise=2010236 av=590054 cb=315315 ctx=348076 wnd=803
+mixed    done in  60.0s  sys=38030437 raise=6202425 av=1512621 cb=1176711 ctx=934039 wnd=2995
+RESULT: PASS
+
+== 20261104-211531-336  (124450 KB)
+# decant run Wed Nov  4 21:15:31 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/decant-investigation-logs/probe/repro-gate2.exe 1
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+seh,+thread,+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-repro/prefix
+repro-gate2: 1s per phase
+syscall  done in   1.0s  sys=950864 raise=0 av=0 cb=4 ctx=0 wnd=0
+raise    done in   1.0s  sys=950864 raise=14034 av=0 cb=4 ctx=0 wnd=0
+av       done in   1.0s  sys=950864 raise=14034 av=9253 cb=4 ctx=0 wnd=0
+callback done in   1.0s  sys=950864 raise=14034 av=9253 cb=12336 ctx=0 wnd=32
+setctx   done in   1.0s  sys=953720 raise=14034 av=9253 cb=12336 ctx=15903 wnd=32
+mixed    done in   3.0s  sys=975997 raise=23167 av=12771 cb=20571 ctx=36962 wnd=53
+RESULT: PASS
+
+== 20261104-214918-3229  (17 KB)
+# decant run Wed Nov  4 21:49:18 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/decant-investigation-logs/probe/repro-smc.exe 50
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+seh,+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-repro/prefix
+00f4:err:virtual:virtual_setup_exception nested exception on signal stack addr 0x7ff815302254 stack 0x2091df980
+
+== 20261104-214953-6234  (17 KB)
+# decant run Wed Nov  4 21:49:53 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/decant-investigation-logs/probe/repro-smc.exe 50
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-repro/prefix
+00f4:err:virtual:virtual_setup_exception nested exception on signal stack addr 0x7ff815302254 stack 0x2091df980
+
+== 20261104-214959-6587  (17 KB)
+# decant run Wed Nov  4 21:49:59 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/decant-investigation-logs/probe/repro-smc.exe 50
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-repro/prefix
+00f4:err:virtual:virtual_setup_exception nested exception on signal stack addr 0x7ff815302254 stack 0x2091df980
+
+== 20261104-215004-7171  (17 KB)
+# decant run Wed Nov  4 21:50:04 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21
+# cmd: ~/Desktop/decant-investigation-logs/probe/repro-smc.exe 50
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=+loaddll
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-repro/prefix
+00f4:err:virtual:virtual_setup_exception nested exception on signal stack addr 0x7ff815302254 stack 0x2091df980
+

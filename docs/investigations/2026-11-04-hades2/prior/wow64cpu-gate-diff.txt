@@ -1,0 +1,73 @@
+# Track A.1 — wow64cpu gate diff: staging 11.21 vs CrossOver 26.1
+# (sanitized; source binaries below are runtime-internal, not part of the upload bundle)
+
+Binaries compared (identical layout, different code):
+  staging : .../runtimes/staging-11.21/lib/wine/x86_64-windows/wow64cpu.dll
+            (mapped at 0x7BF40000 during the crash run)
+  crossover: .../runtimes/crossover-26.1.0/lib/wine/x86_64-windows/wow64cpu.dll
+            (mapped at 0x7BF10000 during the freeze runs)
+
+Host: macOS 26.6 (build 25G72), Darwin 25.6.0, Apple Silicon (T8142).
+Rosetta 2: /usr/libexec/rosetta/oahd present (arm64e binary).
+
+## syscall_32to64 (entry) — both builds identical in shape
+Both begin:
+    xchg  rsp, r14          ; swap to the 64-bit stack
+    mov   [r13+...], edi/esi/ebx/ebp
+    mov   edx, [r14]        ; read the 32-bit syscall number
+    mov   edx, [rip+...]     ; cs32_sel  (global)
+    mov   [r13+0xbc], edx
+    pushfq / pop rdx        ; rflags
+    ...
+    call  Wow64SystemServiceEx  (staging calls 0x7a401cc0 <BTCpuTurboThunkControl+0x100>)
+Then restore registers and:
+    staging:  jb  0x...1af ; iretq   (returns to 32-bit via iretq)
+    crossover: jb  0x...1d3 ; (falls through to syscall_32to64_return)
+
+## The single meaningful difference: the 64->32 return path
+Staging's return path (0x118b..0x120d) ends with:
+    iretq                   ; 0x7a40120d
+    (no Rosetta handling)
+
+CrossOver's return path is split into TWO named functions:
+  0x7a40116d  syscall_32to64_return
+  0x7a4011bd  syscall_32to64_rosetta2_workaround   <-- symbol present only here
+
+CrossOver code at the return point:
+    0x7a401189: btr  [r13-0x4], 0
+    0x7a40118f: jb   0x7a4011d3   (syscall_32to64_rosetta2_workaround+0x16)
+    ...restore rdx/rsp...
+    0x7a4011ad: xchg r14, rsp
+    0x7a4011b0: cmp  dword ptr [0x7a406000], 0   ; global "rosetta2?" flag
+    0x7a4011b8: jne  0x7a4011bd   (syscall_32to64_rosetta2_workaround)
+    0x7a4011ba: jmp  [r14]        ; normal path: far jump back to 32-bit
+    ;--- workaround (only taken when the flag is set) ---
+    0x7a4011bd: sub  rsp, 0x10
+    0x7a4011c1: mov  edx, [r14+0x4]
+    0x7a4011c5: mov  [rsp+0x8], rdx
+    0x7a4011ca: mov  edx, [r14]
+    0x7a4011cd: mov  [rsp], rdx
+    0x7a4011d1: retfq               ; far return instead of iretq/jmp
+
+## Interpretation (inference, clearly marked)
+- CrossOver carries an explicit Rosetta 2 workaround in the 64->32 transition:
+  when a global flag (0x7a406000, presumably set at init when Rosetta is
+  detected) is nonzero, it returns to 32-bit code via `retfq` with a
+  manually built far-return frame, instead of the `jmp [r14]`/`iretq` path.
+- Staging 11.21 has NO such symbol or branch. Its return path uses
+  `iretq` unconditionally.
+- This matches the observed failure modes exactly:
+    staging:  hard fault INSIDE syscall_32to64 at the `mov edx, [rip+0x2ec5]`
+             (cs32_sel load) reading address 0x2EC5, i.e. the 64-bit gate
+             code is being decoded in 32-bit mode because the mode switch
+             never took effect under Rosetta.
+    crossover: no crash; the workaround's retfq path keeps the mode switch
+             working, at the cost of (per the freeze analysis) still
+             executing the surrounding probe loop.
+- The crash is therefore a real Wine/Rosetta defect in the staging build's
+  32->64/64->32 transition, and CrossOver's workaround is evidence that
+  the Wine upstream code is known to need a Rosetta-specific path here.
+
+## What this does NOT explain
+- It does not explain the CrossOver freeze (Track B). That is a separate
+  mechanism: the installer's memory probe loop. See live-playbook.md.

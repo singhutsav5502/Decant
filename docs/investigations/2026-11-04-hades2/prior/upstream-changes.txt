@@ -1,0 +1,41 @@
+# Upstream change list — Wine (wow64cpu / ntdll wow64 on Apple Silicon / Rosetta 2)
+
+Source: analysis/wow64cpu-gate-diff.txt, analysis/fx-gate-findings.txt,
+analysis/repro-attempt.txt, analysis/wow64cpu-attribution.txt, upstream-bug-report.md.
+
+## Change 1 (primary, for the c0000005 crash in syscall_32to64) — port the
+Rosetta 2 far-return workaround into Wine's wow64cpu.
+
+Evidence:
+- Stock staging 11.21 (wow64cpu `iretq`-based return): installer worker/GUI-thread
+  activity under Rosetta → hard fault `c0000005` inside `wow64cpu!syscall_32to64` at the
+  cs32_sel load (`mov edx, [rip+0x2ec5]`, reading 0x2EC5, i.e. displacement-as-address),
+  STATUS_LONGJUMP + NtSetInformationThread(ThreadWow64Context, 0x2cc) relay before it.
+- CrossOver 26.x wow64cpu: contains `syscall_32to64_rosetta2_workaround` (retfq-based
+  far return, gated on a Rosetta-detection flag at 0x7a406000); with the flag set, the
+  function returns to 32-bit via a manually built far-return frame.
+
+Proposed upstream change:
+  - Add the same Rosetta-2-aware far-return path (or reconcile with the existing
+    CrossOver patch) so that, under Rosetta on Apple Silicon, the 64→32 transition of
+    the wow64 syscall gate uses a safe far return (retfq) rather than the bare `iretq`
+    path that faults under Rosetta in the staging build.
+
+Change 2 (for the CrossOver-install freeze — likely resolved by Change 1): none needed
+separately; the fx runtime (staging + CrossOver wow64cpu) allowed the real installer's
+extraction to complete (user click → install completed; setup.tmp not pegged; clean
+module teardown), whereas stock staging froze in the installer's VirtualAlloc halving
+probe loop (infinite size-0 VirtualAlloc/VirtualFree pair).
+
+Change 3 (regression coverage): add a WineTest/probe scenario that drives the wow64
+32↔64 gate through setjmp/longjmp (STATUS_LONGJUMP relay), NtRaiseException + NtContinue,
+exception vectors, window callbacks, thread-context sets and mixed traffic (see
+probe/repro-gate2.c), and assert no hard fault at the gate under a Rosetta-like path.
+
+## Suggested upstream PR/issue framing
+
+- Bug: crash in `wow64cpu!syscall_32to64` reading `cs32_sel` via a displacement
+  (0x2EC5) under Rosetta; plus freeze of installer workers in the VirtualAlloc probe
+  loop on stock staging.
+- Fix direction: port/adapt the CrossOver Rosetta 2 far-return workaround into upstream
+  wow64cpu; add the corresponding regression coverage.

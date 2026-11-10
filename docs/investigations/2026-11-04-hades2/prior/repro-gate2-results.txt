@@ -1,0 +1,57 @@
+# repro-gate2: standalone wow64 gate stress test - results (2026-11-04)
+
+Source:  probe/repro-gate2.c   Binary: probe/repro-gate2.exe (PE32, i686, static, LAA)
+Build:   i686-w64-mingw32-gcc -O1 -static -Wl,--large-address-aware
+Usage:   repro-gate2.exe <seconds-per-phase>   (mixed phase runs 3x as long)
+
+Each phase targets a gate path seen in the staging crash log:
+  syscall   plain syscalls (SwitchToThread) - fast 64->32 return (ljmp / lretq)
+  raise     RaiseException + VEH continue - context rewrite -> slow iretq return
+  av        hardware access violations caught by VEH, resumed
+  callback  SetWindowPos + child CreateWindow/DestroyWindow - win32u user
+            callbacks into the 32-bit wndproc (STATUS_LONGJUMP returns in wow64)
+  setctx    second thread Suspend/Get/SetThreadContext/Resume on a thread busy
+            making syscalls (cross-thread ThreadWow64Context sets)
+  mixed     all of the above at once on 6 threads
+A VEH reports any exception it did not cause (code, addresses, cs/ss) and
+exits with "RESULT: CRASH".
+
+Coverage check (stock staging-11.21, 1 s/phase, WINEDEBUG=+seh,+thread,+loaddll):
+  RtlUnwindEx code=80000026 (STATUS_LONGJUMP)   20,606
+  NtSetInformationThread(...,29 = ThreadWow64Context)   149,042  (36,962 cross-thread)
+  NtQueryInformationThread(...,29)               56,554
+  dispatch_exception                             71,877
+  => every path present in the crash log just before the fault is exercised,
+     at far higher volume than in the installer run.
+
+Runs (20 s/phase, WINEDEBUG=+loaddll, wow64cpu loaded at 0x7BF40000 in both):
+
+                     stock staging-11.21      staging-11.21-cxgate
+                     (bottle vol-repro)        (bottle vol-cxgate, CrossOver wow64cpu)
+  syscalls           38,030,437               12,293,046
+  raised exceptions   6,202,425                4,763,929
+  hardware AVs        1,512,621                1,491,660
+  wndproc callbacks   1,176,711                1,166,439
+  cross-thread ctx      934,039                  921,163
+  child windows           2,995                    2,969
+  result             PASS (no fault)          PASS (no fault)
+
+Logs: bottles/vol-repro/logs/20261104-211216-84839.log
+      bottles/vol-cxgate/logs/20261104-211602-3062.log
+
+Conclusions
+- The crash does NOT reproduce on stock staging, even under sustained load on
+  every suspected gate path. So the swap test cannot show a fix yet: there is
+  no failure to remove.
+- Heavy gate traffic, slow-path (iretq) returns, user callbacks and
+  cross-thread context sets are not sufficient to trigger the bug. Whatever
+  the installer's GUI thread did is more specific (for example the exact
+  32-bit code around the syscall, a nested callback/exception shape, or an
+  unusual way of entering the gate), and is not covered here.
+- The CrossOver wow64cpu (lretq return under Rosetta) works correctly in the
+  staging runtime under the same load.
+- Throughput note (one run each, not repeated): the swapped runtime did about
+  3x fewer syscalls and ~25% fewer raised exceptions in the same time. If that
+  holds on repeat runs, the lretq workaround has a real cost on the fast path.
+  An earlier 1 s smoke run did not show the gap, so treat it as unconfirmed.
+- Report 1 still has no standalone reproducer and should not be filed yet.

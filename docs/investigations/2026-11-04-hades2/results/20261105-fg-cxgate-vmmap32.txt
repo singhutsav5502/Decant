@@ -1,0 +1,37 @@
+70000000-7bb5ffff 191872 KB free    
+7bb60000-7bb60fff      4 KB commit  image
+7bb61000-7bbf5fff    596 KB commit  image
+7bbf6000-7bc17fff    136 KB commit  image
+7bc18000-7bc1afff     12 KB commit  image
+7bc1b000-7bc36fff    112 KB commit  image
+7bc37000-7bc3ffff     36 KB free    
+7bc40000-7bc40fff      4 KB commit  image
+7bc41000-7bca9fff    420 KB commit  image
+7bcaa000-7bcd3fff    168 KB commit  image
+7bcd4000-7bcd7fff     16 KB commit  image
+7bcd8000-7bed2fff   2028 KB commit  image
+7bed3000-7bedffff     52 KB free    
+7bee0000-7bee0fff      4 KB commit  image
+7bee1000-7bf0afff    168 KB commit  image
+7bf0b000-7bf22fff     96 KB commit  image
+7bf23000-7bf23fff      4 KB commit  image
+7bf24000-7bf37fff     80 KB commit  image
+7bf38000-7bf3ffff     32 KB free    
+7bf40000-7bf40fff      4 KB commit  image
+7bf41000-7bf41fff      4 KB commit  image
+7bf42000-7bf42fff      4 KB commit  image
+7bf43000-7bf45fff     12 KB commit  image
+7bf46000-7bf46fff      4 KB commit  image
+7bf47000-7bf47fff      4 KB commit  image
+7bf48000-7bf4afff     12 KB commit  image
+7bf4b000-7bf4ffff     20 KB free    
+7bf50000-7bf50fff      4 KB commit  image
+7bf51000-7bfbbfff    428 KB commit  image
+7bfbc000-7bfddfff    136 KB commit  image
+7bfde000-7bfe0fff     12 KB commit  image
+7bfe1000-7bff2fff     72 KB commit  image
+7bff3000-7ffdffff  65460 KB free    
+7ffe0000-7ffe0fff      4 KB commit  private
+7ffe1000-fffcffff 2097084 KB free    
+fffd0000-fffdffff     64 KB commit  private
+fffe0000-fffeffff     64 KB free    

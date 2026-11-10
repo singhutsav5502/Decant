@@ -1,0 +1,122 @@
+Backtracing for thread 0660 in process 065c (C:\users\<user>\AppData\Local\Temp\is-VMHGQ.tmp\setup.tmp):
+Backtrace:
+=>0 0x00000079dfd0d0 in ntdll (+0xd0d0) (0x0000000022eaa8)
+  1 0x00000001a7b907 in isdone (+0x1b907) (0x0000000022eb64)
+  2 0x00000000493106 in setup.tmp (+0x93106) (0x0000000022eb9c)
+  3 0x00000000494ef1 in setup.tmp (+0x94ef1) (0x0000000022ed20)
+  4 0x0000000049aece in setup.tmp (+0x9aece) (0x0000000022ed70)
+  5 0x0000000048e32a in setup.tmp (+0x8e32a) (0x0000000022ee20)
+  6 0x0000000048d16b in setup.tmp (+0x8d16b) (0x0000000022ee6c)
+  7 0x00000000513bce in setup.tmp (+0x113bce) (0x0000000022ee98)
+  8 0x000000004ec0dd in setup.tmp (+0xec0dd) (0x0000000022eed0)
+  9 0x000000004ed113 in setup.tmp (+0xed113) (0x0000000022ef20)
+  10 0x000000004d0e85 in setup.tmp (+0xd0e85) (0x0000000022ef78)
+  11 0x0000000052e729 in setup.tmp (+0x12e729) (0x0000000022f0bc)
+  12 0x000000005326c4 in setup.tmp (+0x1326c4) (0x0000000022f0fc)
+  13 0x0000000044ca89 in setup.tmp (+0x4ca89) (0x0000000022f128)
+  14 0x00000000532814 in setup.tmp (+0x132814) (0x0000000022f280)
+  15 0x000000005326c4 in setup.tmp (+0x1326c4) (0x0000000022f2c0)
+  16 0x0000000051ae01 in setup.tmp (+0x11ae01) (0x0000000022f2ec)
+  17 0x00000000514cd0 in setup.tmp (+0x114cd0) (0x0000000022f320)
+  18 0x000000004312ea in setup.tmp (+0x312ea) (0x0000000022f338)
+  19 0x000000794ea548 in user32 (+0xa548) (0x0000000022f368)
+  20 0x00000079540ed7 in user32 (+0x60ed7) (0x0000000022f3a0)
+  21 0x00000079546c3a in user32 (+0x66c3a) (0x0000000022f3dc)
+  22 0x00000079546ada in user32 (+0x66ada) (0x0000000022f410)
+  23 0x0000007952b6ed in user32 (+0x4b6ed) (0x0000000022f464)
+  24 0x0000001000fb27 in idp (+0xfb27) (0x0000000022f4f8)
+  25 0x000000100085ed in idp (+0x85ed) (0x0000000022f5ec)
+  26 0x00000000494c2c in setup.tmp (+0x94c2c) (0x0000000022f770)
+  27 0x0000000049aece in setup.tmp (+0x9aece) (0x0000000022f7c0)
+  28 0x0000000048e32a in setup.tmp (+0x8e32a) (0x0000000022f870)
+  29 0x0000000048d16b in setup.tmp (+0x8d16b) (0x0000000022f8bc)
+  30 0x00000000498601 in setup.tmp (+0x98601) (0x0000000022f928)
+  31 0x000000004980ab in setup.tmp (+0x980ab) (0x0000000022fa78)
+  32 0x000000005326c4 in setup.tmp (+0x1326c4) (0x0000000022fab8)
+  33 0x0000000044ca89 in setup.tmp (+0x4ca89) (0x0000000022fae4)
+  34 0x00000000532814 in setup.tmp (+0x132814) (0x0000000022fc3c)
+  35 0x000000005326c4 in setup.tmp (+0x1326c4) (0x0000000022fc7c)
+  36 0x0000000051ae01 in setup.tmp (+0x11ae01) (0x0000000022fca8)
+  37 0x00000000514cd0 in setup.tmp (+0x114cd0) (0x0000000022fcdc)
+  38 0x000000004312ea in setup.tmp (+0x312ea) (0x0000000022fcf4)
+  39 0x000000794ea548 in user32 (+0xa548) (0x0000000022fd24)
+  40 0x00000079540ed7 in user32 (+0x60ed7) (0x0000000022fd5c)
+  41 0x00000079546c3a in user32 (+0x66c3a) (0x0000000022fd98)
+  42 0x00000079532fd8 in user32 (+0x52fd8) (0x0000000022fdc0)
+  43 0x00000079e38221 in ntdll (+0x48221) (0x0000000022fe38)
+  44 0x00000079e0206f in ntdll (+0x1206f) (0x0000000022fe4c)
+  45 0x000000794a1d78 in win32u (+0x11d78) (0x0000000022ff20)
+  46 0x0000000054c231 in setup.tmp (+0x14c231) (0x0000000022ff50)
+  47 0x00000079d5fb58 in kernel32 (+0xfb58) (0x0000000022ff68)
+  48 0x00000079dfe247 in ntdll (+0xe247) (0x0000000022ff80)
+  49 0x00000079e35e65 in ntdll (+0x45e65) (0x0000000022ffec)
+
+Backtracing for thread 0668 in process 065c (C:\users\<user>\AppData\Local\Temp\is-VMHGQ.tmp\setup.tmp):
+Backtrace:
+=>0 0x000000780873df in mmdevapi (+0x173df) (0x000000021bff48)
+  1 0x00000079d5fb58 in kernel32 (+0xfb58) (0x000000021bff68)
+  2 0x00000079dfe247 in ntdll (+0xe247) (0x000000021bff80)
+  3 0x00000079e35e65 in ntdll (+0x45e65) (0x000000021bffec)
+
+Backtracing for thread 066c in process 065c (C:\users\<user>\AppData\Local\Temp\is-VMHGQ.tmp\setup.tmp):
+Backtrace:
+=>0 0x00000079dfd0d0 in ntdll (+0xd0d0) (0x000000022bfef8)
+  1 0x000000780c75b1 in dsound (+0x75b1) (0x000000022bff50)
+  2 0x00000079d5fb58 in kernel32 (+0xfb58) (0x000000022bff68)
+  3 0x00000079dfe247 in ntdll (+0xe247) (0x000000022bff80)
+  4 0x00000079e35e65 in ntdll (+0x45e65) (0x000000022bffec)
+
+Backtracing for thread 0670 in process 065c (C:\users\<user>\AppData\Local\Temp\is-VMHGQ.tmp\setup.tmp):
+Backtrace:
+=>0 0x00000079dfd0d0 in ntdll (+0xd0d0) (0x000000023bff20)
+  1 0x00000011005351 in bass (+0x5351) (0x000000023bff50)
+  2 0x00000079d5fb58 in kernel32 (+0xfb58) (0x000000023bff68)
+  3 0x00000079dfe247 in ntdll (+0xe247) (0x000000023bff80)
+  4 0x00000079e35e65 in ntdll (+0x45e65) (0x000000023bffec)
+
+Backtracing for thread 0674 in process 065c (C:\users\<user>\AppData\Local\Temp\is-VMHGQ.tmp\setup.tmp):
+Backtrace:
+=>0 0x00000079dfd640 in ntdll (+0xd640) (0x000000024bfed8)
+  1 0x00000079b010e5 in kernelbase (+0x710e5) (0x000000024bfefc)
+  2 0x0000001102082f in bass (+0x2082f) (0x000000024bff50)
+  3 0x00000079d5fb58 in kernel32 (+0xfb58) (0x000000024bff68)
+  4 0x00000079dfe247 in ntdll (+0xe247) (0x000000024bff80)
+  5 0x00000079e35e65 in ntdll (+0x45e65) (0x000000024bffec)
+
+Backtracing for thread 0678 in process 065c (C:\users\<user>\AppData\Local\Temp\is-VMHGQ.tmp\setup.tmp):
+Backtrace:
+=>0 0x00000079dfd0d0 in ntdll (+0xd0d0) (0x000000025bff38)
+  1 0x00000011020239 in bass (+0x20239) (0x000000025bff68)
+  2 0x00000079dfe247 in ntdll (+0xe247) (0x000000025bff80)
+  3 0x00000079e35e65 in ntdll (+0x45e65) (0x000000025bffec)
+
+Backtracing for thread 067c in process 065c (C:\users\<user>\AppData\Local\Temp\is-VMHGQ.tmp\setup.tmp):
+Backtrace:
+=>0 0x000000794a1c28 in win32u (+0x11c28) (0x0000000297fe7c)
+  1 0x000000100103e4 in idp (+0x103e4) (0x0000000000000f)
+
+Backtracing for thread 06b8 in process 065c (C:\users\<user>\AppData\Local\Temp\is-VMHGQ.tmp\setup.tmp):
+Backtrace:
+=>0 0x00000079dfd0d0 in ntdll (+0xd0d0) (0x00000002d8ee18)
+  1 0x00000061081238 in unarc (+0x1238) (0x00000002fb9320)
+  2 0x000000610cb480 in unarc (+0x4b480) (0x000000000001bc)
+
+Backtracing for thread 06c0 in process 065c (C:\users\<user>\AppData\Local\Temp\is-VMHGQ.tmp\setup.tmp):
+Backtrace:
+=>0 0x00000079dfd270 in ntdll (+0xd270) (0x00000002c8ec38)
+  1 0x0000006108aaf4 in unarc (+0xaaf4) (0x00000000000001)
+
+Backtracing for thread 06f4 in process 065c (C:\users\<user>\AppData\Local\Temp\is-VMHGQ.tmp\setup.tmp):
+Backtrace:
+=>0 0x000000fff40de4 (0x000000030cff68)
+  1 0x00000079dfe247 in ntdll (+0xe247) (0x000000030cff80)
+  2 0x00000079e35e65 in ntdll (+0x45e65) (0x000000030cffec)
+WineDbg can't debug several processes at once.
+Either 'detach' from current one, or use another instance of WineDbg
+
+warning: could not attach to 0684
+WineDbg can't debug several processes at once.
+Either 'detach' from current one, or use another instance of WineDbg
+
+warning: could not attach to 06e4
+Wine-dbg>Wine-dbg>

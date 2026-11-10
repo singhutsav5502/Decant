@@ -1,0 +1,61 @@
+# repro-smc: self-modifying-code trigger for the wow64cpu gate fault - results (2026-11-04)
+
+Source: probe/repro-smc.c   Binary: probe/repro-smc.exe (PE32, i686, static)
+Idea taken from the test case described in Wine bug 60034 (comment 11); this
+is an independent re-implementation.
+
+What it does, per round:
+  write "mov eax, i; ret" into a 16-byte slot of one RWX page
+  FlushInstructionCache, call it, check the result, Sleep(0) (a syscall)
+The bug needs code that ALREADY RAN to be rewritten, so round 1 (the second
+write to the same page) is the first round that can fail.
+
+Results (macOS 26.6 25G72, Apple Silicon, Rosetta 2):
+
+  runtime                              runs   outcome
+  staging-11.21 (stock)                 4     crash in round 1, 4/4 (1 with +seh, 3 without)
+                                              "err:virtual:virtual_setup_exception nested
+                                               exception on signal stack addr 0x7ff815302254"
+  staging-11.21-cxgate                  4     PASS: 50/50 rounds once, then 500/500 rounds 3 times
+  (CrossOver 26.1 wow64cpu.dll)
+
+Interpretation
+- This is a deterministic, standalone reproducer, and the swap test is now
+  meaningful: CrossOver's wow64cpu turns a 100% crash into a 100% pass.
+- The trigger matches Wine bug 60034 (Resource Hacker, MSN Messenger, WiX
+  Dark.exe): the page fault there is a read of 0x00002ec5 in wow64 32-bit
+  code at syscall_32to64, the same as our staging crash. In our run the fault
+  escalates into a nested exception on the host signal stack before Wine can
+  print the address, so the exact 0x2ec5 line was not captured here (not
+  verified).
+- Why the earlier repro-gate2 never crashed: it never rewrote executed code.
+  Volume of syscalls/exceptions/callbacks is irrelevant; SMC is the trigger.
+  Installers that unpack code into memory and run it (packers, protectors,
+  Delphi runtime patching) hit this.
+
+The actual fix (CrossOver "CW HACK 20760", attached to bug 60034 as 81767)
+changes BOTH directions of the gate when Rosetta is detected
+(SystemProcessorBrandString contains "VirtualApple"):
+  1. 32->64 entry: the runtime-built thunk uses a far CALL (ff 1d, lcall)
+     into a tiny 64-bit trampoline ("add $8,%esp; jmp *[rip]" to
+     syscall_32to64 / unix_call_32to64) instead of a far JMP (ff 2d, ljmp).
+     This lives in memory built by BTCpuProcessInit, so it did not show up
+     in the DLL disassembly diff (analysis/wow64cpu-gate-diff.txt).
+  2. 64->32 return: lretq with a hand-built frame instead of ljmp *(%r14).
+  The patch comment calls it a workaround for "a SIGUSR1 race condition".
+  Correction to earlier notes: patching only the return path (as first
+  suggested) would be incomplete; the entry thunk is the half that matches
+  our fault (CPU stays in 32-bit mode after entering the gate).
+
+Upstream status
+- Wine bug 60034: RESOLVED NOTOURBUG. Alexandre Julliard: it is a Rosetta bug,
+  believed fixed in recent versions. It still reproduces here on macOS 26.6
+  with Wine staging 11.21, so "fixed in recent Rosetta" does not hold for this
+  host.
+- No newer Gcenx build than 11.21 exists (checked 2026-11-04).
+- So: no new Wine bug to file. Useful actions instead:
+    * report to Apple (Feedback Assistant) with repro-smc.exe as the testcase
+    * optionally add a comment on bug 60034 that it still reproduces on
+      macOS 26.6 / staging 11.21 with this reproducer
+    * for local use: run 32-bit apps on CrossOver, or on staging with the
+      patched wow64cpu.dll (the swapped runtime proves it works)

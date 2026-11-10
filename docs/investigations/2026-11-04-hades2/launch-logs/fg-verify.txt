@@ -1,0 +1,138 @@
+== 20261104-202028-56194: same log as in an earlier bottle (bottle was cloned)
+== 20261104-205906-64429: same log as in an earlier bottle (bottle was cloned)
+== 20261104-205909-64778: same log as in an earlier bottle (bottle was cloned)
+== 20261104-205910-64867: same log as in an earlier bottle (bottle was cloned)
+== 20261104-211114-79983: same log as in an earlier bottle (bottle was cloned)
+== 20261104-211157-83517: same log as in an earlier bottle (bottle was cloned)
+== 20261104-211520-99205: same log as in an earlier bottle (bottle was cloned)
+== 20261104-211602-3062: same log as in an earlier bottle (bottle was cloned)
+== 20261104-214923-3586: same log as in an earlier bottle (bottle was cloned)
+== 20261104-215028-9214: same log as in an earlier bottle (bottle was cloned)
+== 20261104-215030-9332: same log as in an earlier bottle (bottle was cloned)
+== 20261104-215032-9662: same log as in an earlier bottle (bottle was cloned)
+== 20261104-220221-29187: same log as in an earlier bottle (bottle was cloned)
+== 20261104-222351-21549: same log as in an earlier bottle (bottle was cloned)
+== 20261104-222615-23930: same log as in an earlier bottle (bottle was cloned)
+== 20261104-224521-41543: same log as in an earlier bottle (bottle was cloned)
+== 20261104-230834-93566: same log as in an earlier bottle (bottle was cloned)
+== 20261104-230913-95374: same log as in an earlier bottle (bottle was cloned)
+== 20261104-231003-96192: same log as in an earlier bottle (bottle was cloned)
+== 20261104-231958-13595: same log as in an earlier bottle (bottle was cloned)
+== 20261104-233941-13072  (8 KB)
+# decant run Wed Nov  4 23:39:41 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/crossover-26.1.0+d3dmetal
+# cmd: C:\Program Files\Hades II\Ship\Hades2.exe
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=dxgi,d3d11,d3d12,d3d10core=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-verify/prefix
+2026-11-04 23:39:50 [MainThread      ]     ProfileManager.cpp:222    ERR| Load profile Profile1.sjson failed! Load status: 1
+2026-11-04 23:39:50 [MainThread      ]     ProfileManager.cpp:222    ERR| Load profile GlobalSettingsWin.sjson failed! Load status: 1
+2026-11-04 23:39:51 [MainThread      ]      ForgeRenderer.cpp:2192  INFO| Aftermath GFSDK_Aftermath_EnableGpuCrashDumps failed
+2026-11-04 23:39:51 [MainThread      ]      ForgeRenderer.cpp:2200  INFO| Graphics Adapter Preferece: AUTO
+HRESULT DXGIGetDebugInterface1(UINT, const IID *const, void **)
+2026-11-04 23:39:51 [MainThread      ]      ForgeRenderer.cpp:2251  INFO| Aftermath GFSDK_Aftermath_DX12_Initialize failed
+2026-11-04 23:39:51 [MainThread      ]      ForgeRenderer.cpp:2261  INFO| Amd driver version detected: 0
+2026-11-04 23:39:51 [MainThread      ]      ForgeRenderer.cpp:2262  INFO| Nvidia driver version detected: 0
+2026-11-04 23:39:51 [MainThread      ]            Program.cpp:3265  INFO| Renderer Initialized
+2026-11-04 23:39:51 [MainThread      ]      ForgeRenderer.cpp:2520  INFO| ForgeRenderer::Load
+2026-11-04 23:39:51 [MainThread      ]            Program.cpp:3285  INFO| Renderer Loaded
+
+== 20261104-234035-14643  (0 KB)
+# decant run Wed Nov  4 23:40:35 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/crossover-26.1.0
+# cmd: cmd /c ver
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-verify/prefix
+
+== 20261104-234045-14958  (0 KB)
+# decant run Wed Nov  4 23:40:45 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: winecfg
+# CX_REPORT_REAL_USERNAME=1
+# MVK_CONFIG_LOG_LEVEL=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=dxgi,d3d9,d3d10core,d3d11=b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-verify/prefix
+
+== 20261104-234825-33252  (27 KB)
+# decant run Wed Nov  4 23:48:25 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/staging-11.21-cxgate
+# cmd: ~/Library/Application Support/Decant/bottles/games/prefix/drive_c/Program Files/Hollow Knight Silksong/Hollow Knight Silksong.exe
+# CX_REPORT_REAL_USERNAME=1
+# DXVK_ASYNC=1
+# DXVK_STATE_CACHE_PATH=~/Library/Application Support/Decant/bottles/fg-verify/cache
+# MVK_CONFIG_FAST_MATH_ENABLED=1
+# MVK_CONFIG_LOG_LEVEL=1
+# MVK_CONFIG_RESUME_LOST_DEVICE=1
+# MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS=0
+# MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=d3d10core,d3d11=n,b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-verify/prefix
+info:  OpenVR: Failed to locate module
+info:    VK_KHR_get_surface_capabilities2
+info:    VK_KHR_surface
+info:    VK_KHR_win32_surface
+info:    Device name:     : Apple M5
+info:    VK_KHR_create_renderpass2
+info:    VK_KHR_depth_stencil_resolve
+info:    VK_KHR_driver_properties
+info:    VK_KHR_image_format_list
+info:    VK_KHR_sampler_mirror_clamp_to_edge
+info:    VK_KHR_shader_float_controls
+info:    VK_KHR_swapchain
+info:    VK_KHR_timeline_semaphore
+info:  VK_KHR_buffer_device_address
+info:  VK_KHR_timeline_semaphore
+
+== 20261104-235131-44496  (12 KB)
+# decant run Wed Nov  4 23:51:31 IST 2026
+# runtime: ~/Library/Application Support/Decant/runtimes/cxvk-test
+# cmd: ~/Library/Application Support/Decant/bottles/games/prefix/drive_c/Program Files/Hollow Knight Silksong/Hollow Knight Silksong.exe
+# CX_REPORT_REAL_USERNAME=1
+# DXVK_ASYNC=1
+# DXVK_STATE_CACHE_PATH=~/Library/Application Support/Decant/bottles/fg-verify/cache
+# MVK_CONFIG_FAST_MATH_ENABLED=1
+# MVK_CONFIG_LOG_LEVEL=1
+# MVK_CONFIG_RESUME_LOST_DEVICE=1
+# MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS=0
+# MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS=1
+# ROSETTA_ADVERTISE_AVX=1
+# WINEDEBUG=-all
+# WINEDLLOVERRIDES=d3d10core,d3d11=n,b
+# WINEESYNC=1
+# WINEMSYNC=1
+# WINEPREFIX=~/Library/Application Support/Decant/bottles/fg-verify/prefix
+info:  OpenVR: Failed to locate module
+info:    VK_KHR_get_surface_capabilities2
+info:    VK_KHR_surface
+info:    VK_KHR_win32_surface
+info:    Device name:     : Apple M5
+info:    VK_KHR_create_renderpass2
+info:    VK_KHR_depth_stencil_resolve
+info:    VK_KHR_driver_properties
+info:    VK_KHR_image_format_list
+info:    VK_KHR_sampler_mirror_clamp_to_edge
+info:    VK_KHR_shader_float_controls
+info:    VK_KHR_swapchain
+info:    VK_KHR_timeline_semaphore
+info:  VK_KHR_buffer_device_address
+info:  VK_KHR_timeline_semaphore
+

@@ -1,0 +1,5 @@
+# build outputs
+dist/
+app/.build/
+.DS_Store
+# prebuilt shims ARE committed on purpose (docs/adr/0007)

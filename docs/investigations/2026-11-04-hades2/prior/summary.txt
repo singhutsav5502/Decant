@@ -1,0 +1,56 @@
+investigation summary (sanitized) - revised after review of the third run
+(pre-review version kept as summary.orig.txt)
+environment: macOS 26.6 arm64, Wine x86_64 translated via Rosetta, new wow64 mode
+installer: 32-bit Inno Setup (setup.exe -> setup.tmp) with native plugins idp.dll, innocallback.dll, ISDone.dll (volume extractor)
+
+TWO SEPARATE FINDINGS
+---------------------
+A) staging 11.21: hard crash in Wine's own wow64cpu!syscall_32to64 (GUI thread of setup.tmp)
+B) crossover 26.1 build: 100%-CPU freeze = extractor memory-probe loop that never exits (worker thread)
+They are on different threads and there is no evidence linking them. See upstream-bug-report.md.
+
+runs, crossover build (finding B)
+run1: setup GUI ok, inno phase ok, extraction starts, stalls at ~32MB/11 files; main (GUI) thread polls NtWaitForSingleObject with a 10ms timeout x75000; one core 100%
+      [corrected: "one worker thread exits" was wrong - the worker was alive, spinning in the probe loop; the 100% core is that worker, not the GUI thread]
+run2 same with msync/esync disabled: identical outcome
+run3 sync trace: waiting object handle never signaled by thread 0118
+      [corrected: 0118 is the GUI thread polling; the handle is never signaled because the extraction worker never leaves its loop]
+plain non-elevated run: identical freeze
+windows 7 winver: identical freeze
+silent inno mode: crossover freezes the same way
+
+runs, staging 11.21 build (finding A)
+crash right after clicking Install, deterministic: 1594 c0000005 dispatches + 2 c00000fd stack overflows; process exits
+AVX advertised on/off: identical (1594 faults both)
+MSYNC off: identical crash
+silent inno mode: silent exit
+
+common
+archive volumes verified OK against checksum manifest, all 7 parts byte-perfect
+installer log shows inno phase writes only helper files, addon loaders and uninstaller; game content comes from volume extractor
+
+conclusion
+A is a Wine wow64/Rosetta bug: the faulting read address 0x2ec5 equals the RIP-relative
+  displacement of "movl cs32_sel(%rip),%edx", i.e. the 64-bit gate code was decoded in
+  32-bit mode (mode switch on the 32->64 gate did not take effect). Ready to report.
+B is not yet shown to be a Wine bug: Wine's address-space answers match 64-bit Windows
+  (memprobe: non-LAA largest reserve 1970 MB, LAA 4 GB with 2048 MB free at 0x7FFE1000),
+  and the loop ignores VirtualAlloc's result. Its exit test is still unknown.
+
+Third instrumented run (2026-11-04 18:25, crossover build, +virtual,+sync,+thread,+file,+seh)
+--------------------------------------------------------------------------------------------
+Freeze (34 MB / 11 files) fully decoded. Extraction worker 0178 spins at 100% CPU in a
+memory-probe loop: VirtualFree(prev); VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_READWRITE);
+size >>= 1, from 0x7fffffff down to 0. Every non-zero size succeeds - expected, since setup.tmp is
+large-address-aware (TotalVirtual ~4 GB) and real 64-bit Windows would also grant these.
+At size 0 the call fails and the loop repeats the failing pair forever (~4.5M iterations in the
+last ~9.1M lines). The loop continued after a 2 GB success and after the size-0 failure, so its
+exit test does not depend on the VirtualAlloc result. No rate (crossings per second/minute)
+can be stated: the log has no timestamps.
+The worker was never dead or wedged in the return gate - earlier "went silent" observations
+were the same loop without +virtual tracing.
+Analysis: analysis/wow64cpu-attribution.txt (final section + CORRECTIONS). Evidence: games/excerpts/, probe/results/.
+
+next steps for B: find the loop's exit test in the extractor code (disassembly or +relay around the
+GlobalMemoryStatusEx / NtQuerySystemInformation calls); run on real Windows x64 or native Linux Wine
+for comparison; re-run with +timestamp if a rate is needed.

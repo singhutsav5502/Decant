@@ -1,0 +1,3 @@
+reserve(0x7fffffff) -> 7FFF0000 (err 0)
+search: HANGS (cap hit) after 200 steps, lo=0x00000001 hi=0x00000000
+largest free region: 2048 MB at 7FFE1000

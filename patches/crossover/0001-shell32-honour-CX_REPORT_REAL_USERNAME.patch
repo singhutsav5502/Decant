@@ -1,0 +1,21 @@
+--- a/dlls/shell32/shellpath.c	2026-11-04 12:30:51
++++ b/dlls/shell32/shellpath.c	2026-11-04 12:30:51
+@@ -2632,9 +2632,16 @@
+         }
+         else if (!wcsnicmp(szTemp, L"%USERPROFILE%", lstrlenW(L"%USERPROFILE%")))
+         {
+-            /* CrossOver Hack 12735 */
+-            static const WCHAR userName[] = {'c','r','o','s','s','o','v','e','r',0};
++            /* CrossOver Hack 12735, made optional by decant: with CX_REPORT_REAL_USERNAME
++             * set, use the real user name (as advapi32's GetUserName then does), so known
++             * folders match %USERPROFILE% and bottles stay portable between Wine builds. */
++            WCHAR userName[256] = L"crossover";
+ 
++            if (GetEnvironmentVariableW(L"CX_REPORT_REAL_USERNAME", NULL, 0))
++            {
++                DWORD len = GetEnvironmentVariableW(L"WINEUSERNAME", userName, ARRAY_SIZE(userName));
++                if (!len || len >= ARRAY_SIZE(userName)) lstrcpyW(userName, L"crossover");
++            }
+             lstrcpyW(szDest, szProfilesPrefix);
+             PathAppendW(szDest, userName);
+             PathAppendW(szDest, szTemp + lstrlenW(L"%USERPROFILE%"));

@@ -1,0 +1,5 @@
+BACKEND=wined3d
+AVX=1
+MSYNC=1
+WINVER=win10
+RUNTIME=staging-11.21-cxgate

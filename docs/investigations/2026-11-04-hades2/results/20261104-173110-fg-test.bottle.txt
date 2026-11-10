@@ -1,0 +1,5 @@
+RUNTIME=staging-11.21
+AVX=0
+MSYNC=0
+WINVER=win7
+BACKEND=wined3d
